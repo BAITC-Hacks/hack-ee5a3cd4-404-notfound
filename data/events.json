@@ -1,0 +1,335 @@
+{
+  "events": [
+    {
+      "event_id": "EV_001",
+      "title": "Обязательный инструктаж по информационной безопасности Halyk Bank 2026",
+      "description": "Ежегодная проверка знаний требований кибербезопасности, фишинга и защиты персональных данных.",
+      "type": "compliance",
+      "format": "online",
+      "duration_hours": 4,
+      "mandatory": true,
+      "target_roles": [],
+      "target_grades": [],
+      "develops_skills": [
+        { "skill_id": "SK_005", "gain": 1, "max_level": 3 }
+      ],
+      "prerequisites": {},
+      "upcoming_sessions": ["2026-10-01", "2026-11-01"]
+    },
+    {
+      "event_id": "EV_002",
+      "title": "Онбординг новичка: Архитектурные стандарты и стек банка",
+      "description": "Вводный курс для новых сотрудников инженерного блока по внутренним стандартам и процессам разработки.",
+      "type": "onboarding",
+      "format": "online",
+      "duration_hours": 8,
+      "mandatory": true,
+      "target_roles": ["Backend Developer", "Frontend Developer", "DevOps Engineer", "QA Automation Engineer"],
+      "target_grades": ["Junior", "Middle"],
+      "develops_skills": [
+        { "skill_id": "SK_010", "gain": 1, "max_level": 2 }
+      ],
+      "prerequisites": {},
+      "upcoming_sessions": ["2026-09-30"]
+    },
+    {
+      "event_id": "EV_003",
+      "title": "Практический воркшоп: Архитектура распределенных систем и System Design",
+      "description": "Глубокое погружение в декомпозицию монолита, паттерны CQRS, Event Sourcing, саги и распределенные транзакции в финтехе.",
+      "type": "workshop",
+      "format": "hybrid",
+      "duration_hours": 16,
+      "mandatory": false,
+      "target_roles": ["Backend Developer", "DevOps Engineer", "System Analyst", "Data Engineer"],
+      "target_grades": ["Middle", "Senior", "Lead"],
+      "develops_skills": [
+        { "skill_id": "SK_001", "gain": 1, "max_level": 5 },
+        { "skill_id": "SK_004", "gain": 1, "max_level": 4 }
+      ],
+      "prerequisites": {
+        "SK_002": 2
+      },
+      "upcoming_sessions": ["2026-10-05", "2026-10-20"]
+    },
+    {
+      "event_id": "EV_004",
+      "title": "Курс: Высоконагруженная микросервисная разработка",
+      "description": "Разработка resilient-сервисов с gRPC, Kafka, Circuit Breaker, шардированием и кэшированием.",
+      "type": "course",
+      "format": "online",
+      "duration_hours": 32,
+      "mandatory": false,
+      "target_roles": ["Backend Developer"],
+      "target_grades": ["Junior", "Middle", "Senior"],
+      "develops_skills": [
+        { "skill_id": "SK_002", "gain": 1, "max_level": 5 },
+        { "skill_id": "SK_001", "gain": 1, "max_level": 4 }
+      ],
+      "prerequisites": {
+        "SK_002": 1
+      },
+      "upcoming_sessions": ["2026-10-10"]
+    },
+    {
+      "event_id": "EV_005",
+      "title": "Сертификация: Сертифицированный архитектор банковских платформ (Halyk Certified Arch)",
+      "description": "Комплексная сертификация по системному дизайну, отказоустойчивости 99.999% и протоколам высокой доступности.",
+      "type": "certification",
+      "format": "offline",
+      "duration_hours": 12,
+      "mandatory": false,
+      "target_roles": ["Backend Developer", "DevOps Engineer", "Data Engineer"],
+      "target_grades": ["Senior", "Lead"],
+      "develops_skills": [
+        { "skill_id": "SK_001", "gain": 1, "max_level": 5 },
+        { "skill_id": "SK_005", "gain": 1, "max_level": 5 }
+      ],
+      "prerequisites": {
+        "SK_001": 2
+      },
+      "upcoming_sessions": ["2026-11-15"]
+    },
+    {
+      "event_id": "EV_006",
+      "title": "Митап: Ораторское мастерство для IT-специалистов и публичные выступления",
+      "description": "Практика преодоления страха сцены, сторителлинг, слайды и подготовка докладов на IT-конференциях.",
+      "type": "meetup",
+      "format": "offline",
+      "duration_hours": 6,
+      "mandatory": false,
+      "target_roles": [],
+      "target_grades": ["Middle", "Senior", "Lead"],
+      "develops_skills": [
+        { "skill_id": "SK_006", "gain": 1, "max_level": 4 }
+      ],
+      "prerequisites": {},
+      "upcoming_sessions": ["2026-10-02", "2026-10-18"]
+    },
+    {
+      "event_id": "EV_007",
+      "title": "Воркшоп: Прожарка базы данных PostgreSQL в Highload",
+      "description": "Анализ EXPLAIN ANALYZE, bloat таблиц, pg_stat_statements, connection pooling (PgBouncer), партиционирование и настройка WAL.",
+      "type": "workshop",
+      "format": "hybrid",
+      "duration_hours": 14,
+      "mandatory": false,
+      "target_roles": ["Backend Developer", "Data Engineer", "DevOps Engineer", "System Analyst"],
+      "target_grades": ["Junior", "Middle", "Senior", "Lead"],
+      "develops_skills": [
+        { "skill_id": "SK_004", "gain": 1, "max_level": 5 }
+      ],
+      "prerequisites": {},
+      "upcoming_sessions": ["2026-10-12"]
+    },
+    {
+      "event_id": "EV_008",
+      "title": "Курс: Kubernetes для Production и GitOps",
+      "description": "Helm, ArgoCD, Service Mesh (Istio), сетевые политики, ingress-контроллеры и траблшутинг подов в бою.",
+      "type": "course",
+      "format": "online",
+      "duration_hours": 24,
+      "mandatory": false,
+      "target_roles": ["DevOps Engineer", "Backend Developer", "QA Automation Engineer"],
+      "target_grades": ["Junior", "Middle", "Senior"],
+      "develops_skills": [
+        { "skill_id": "SK_003", "gain": 1, "max_level": 5 }
+      ],
+      "prerequisites": {},
+      "upcoming_sessions": ["2026-10-15"]
+    },
+    {
+      "event_id": "EV_009",
+      "title": "Сертификация: DevSecOps & Стандарты PCI DSS 4.0",
+      "description": "SAST/DAST сканирование пайплайнов, управление секретами в Vault, аудит соответствия международным стандартам безопасности платежей.",
+      "type": "certification",
+      "format": "online",
+      "duration_hours": 16,
+      "mandatory": false,
+      "target_roles": ["Backend Developer", "DevOps Engineer", "System Analyst"],
+      "target_grades": ["Middle", "Senior", "Lead"],
+      "develops_skills": [
+        { "skill_id": "SK_005", "gain": 1, "max_level": 5 },
+        { "skill_id": "SK_009", "gain": 1, "max_level": 4 }
+      ],
+      "prerequisites": {},
+      "upcoming_sessions": ["2026-10-25"]
+    },
+    {
+      "event_id": "EV_010",
+      "title": "Программа менторства: Школа тимлидов и технических лидеров Halyk",
+      "description": "Персональное наставничество от Principal инженеров: проведение 1-on-1, развитие подчиненных, делегирование и разрешение конфликтов.",
+      "type": "mentoring",
+      "format": "hybrid",
+      "duration_hours": 20,
+      "mandatory": false,
+      "target_roles": [],
+      "target_grades": ["Senior", "Lead"],
+      "develops_skills": [
+        { "skill_id": "SK_007", "gain": 1, "max_level": 5 },
+        { "skill_id": "SK_010", "gain": 1, "max_level": 5 }
+      ],
+      "prerequisites": {
+        "SK_010": 2
+      },
+      "upcoming_sessions": ["2026-10-08"]
+    },
+    {
+      "event_id": "EV_011",
+      "title": "Воркшоп: Современный системный анализ и интеграции через OpenAPI/Kafka",
+      "description": "Проектирование API-first, схемы контрактов AsyncAPI, трассировка требований и спецификации для финтех-модулей.",
+      "type": "workshop",
+      "format": "online",
+      "duration_hours": 12,
+      "mandatory": false,
+      "target_roles": ["System Analyst", "Backend Developer", "Product Manager"],
+      "target_grades": ["Junior", "Middle", "Senior"],
+      "develops_skills": [
+        { "skill_id": "SK_008", "gain": 1, "max_level": 5 },
+        { "skill_id": "SK_001", "gain": 1, "max_level": 3 }
+      ],
+      "prerequisites": {},
+      "upcoming_sessions": ["2026-10-14"]
+    },
+    {
+      "event_id": "EV_012",
+      "title": "Курс: Фронтенд-архитектура, Microfrontends и Web Performance",
+      "description": "Module Federation, оптимизация bundle size, LCP/INP/CLS метрики, кэширование и State Management в больших веб-банках.",
+      "type": "course",
+      "format": "online",
+      "duration_hours": 28,
+      "mandatory": false,
+      "target_roles": ["Frontend Developer"],
+      "target_grades": ["Junior", "Middle", "Senior", "Lead"],
+      "develops_skills": [
+        { "skill_id": "SK_011", "gain": 1, "max_level": 5 },
+        { "skill_id": "SK_001", "gain": 1, "max_level": 3 }
+      ],
+      "prerequisites": {
+        "SK_011": 1
+      },
+      "upcoming_sessions": ["2026-10-09"]
+    },
+    {
+      "event_id": "EV_013",
+      "title": "Воркшоп: Автоматизация тестирования и Chaos Engineering",
+      "description": "Построение тестового пайплайна на Playwright/Pytest, контрактное тестирование Pact и стресс-тесты k6.",
+      "type": "workshop",
+      "format": "hybrid",
+      "duration_hours": 16,
+      "mandatory": false,
+      "target_roles": ["QA Automation Engineer", "Backend Developer", "DevOps Engineer"],
+      "target_grades": ["Junior", "Middle", "Senior", "Lead"],
+      "develops_skills": [
+        { "skill_id": "SK_012", "gain": 1, "max_level": 5 },
+        { "skill_id": "SK_002", "gain": 1, "max_level": 3 }
+      ],
+      "prerequisites": {},
+      "upcoming_sessions": ["2026-10-19"]
+    },
+    {
+      "event_id": "EV_014",
+      "title": "Интенсив: Потоковая обработка данных с Apache Spark & Kafka",
+      "description": "ETL-архитектура, Real-time data stream, Lakehouse архитектуры (Iceberg, ClickHouse) для банковских транзакций.",
+      "type": "course",
+      "format": "online",
+      "duration_hours": 30,
+      "mandatory": false,
+      "target_roles": ["Data Engineer", "Backend Developer"],
+      "target_grades": ["Middle", "Senior", "Lead"],
+      "develops_skills": [
+        { "skill_id": "SK_013", "gain": 1, "max_level": 5 },
+        { "skill_id": "SK_004", "gain": 1, "max_level": 4 }
+      ],
+      "prerequisites": {
+        "SK_004": 2
+      },
+      "upcoming_sessions": ["2026-10-22"]
+    },
+    {
+      "event_id": "EV_015",
+      "title": "Митап: Управление продуктовыми метриками и CustDev в финтехе",
+      "description": "A/B тесты, unit-экономика продуктов, исследование клиентского опыта и приоритизация фич по RICE.",
+      "type": "meetup",
+      "format": "hybrid",
+      "duration_hours": 6,
+      "mandatory": false,
+      "target_roles": ["Product Manager", "System Analyst"],
+      "target_grades": ["Junior", "Middle", "Senior"],
+      "develops_skills": [
+        { "skill_id": "SK_014", "gain": 1, "max_level": 5 },
+        { "skill_id": "SK_008", "gain": 1, "max_level": 4 }
+      ],
+      "prerequisites": {},
+      "upcoming_sessions": ["2026-10-06"]
+    },
+    {
+      "event_id": "EV_016",
+      "title": "Воркшоп: Эффективное кросс-функциональное взаимодействие в Scrum",
+      "description": "Практикум фасилитации встреч, устранение коммуникационных блокеров между командами разработки и бизнеса.",
+      "type": "workshop",
+      "format": "offline",
+      "duration_hours": 8,
+      "mandatory": false,
+      "target_roles": [],
+      "target_grades": ["Junior", "Middle", "Senior", "Lead"],
+      "develops_skills": [
+        { "skill_id": "SK_010", "gain": 1, "max_level": 5 },
+        { "skill_id": "SK_014", "gain": 1, "max_level": 3 }
+      ],
+      "prerequisites": {},
+      "upcoming_sessions": ["2026-10-11"]
+    },
+    {
+      "event_id": "EV_017",
+      "title": "Курс: Финансовые риски, комплаенс и противодействие мошенничеству (AML)",
+      "description": "Анализ подозрительных операций, требования Национального Банка, скоринг транзакций и комплаенс-контроль.",
+      "type": "course",
+      "format": "online",
+      "duration_hours": 18,
+      "mandatory": false,
+      "target_roles": ["Product Manager", "System Analyst", "Data Engineer"],
+      "target_grades": ["Middle", "Senior", "Lead"],
+      "develops_skills": [
+        { "skill_id": "SK_009", "gain": 1, "max_level": 5 }
+      ],
+      "prerequisites": {},
+      "upcoming_sessions": ["2026-10-16"]
+    },
+    {
+      "event_id": "EV_018",
+      "title": "Менторинг: Архитектурный надзор и подготовка к грейду Lead",
+      "description": "Индивидуальная работа с Principal Architect: защита решений на Architecture Review Board (ARB).",
+      "type": "mentoring",
+      "format": "hybrid",
+      "duration_hours": 16,
+      "mandatory": false,
+      "target_roles": ["Backend Developer", "Frontend Developer", "DevOps Engineer", "Data Engineer", "System Analyst"],
+      "target_grades": ["Senior", "Lead"],
+      "develops_skills": [
+        { "skill_id": "SK_001", "gain": 1, "max_level": 5 },
+        { "skill_id": "SK_007", "gain": 1, "max_level": 5 }
+      ],
+      "prerequisites": {
+        "SK_001": 3
+      },
+      "upcoming_sessions": ["2026-10-24"]
+    },
+    {
+      "event_id": "EV_036",
+      "title": "Клуб архитектурных дебатов Halyk Tech Talk (повторяемый клуб)",
+      "description": "Регулярный дискуссионный клуб для инженеров и аналитиков: разбор реальных инцидентов, дебаты по техническим решениям и практика аргументации.",
+      "type": "meetup",
+      "format": "hybrid",
+      "duration_hours": 4,
+      "mandatory": false,
+      "target_roles": [],
+      "target_grades": ["Junior", "Middle", "Senior", "Lead"],
+      "develops_skills": [
+        { "skill_id": "SK_006", "gain": 1, "max_level": 5 },
+        { "skill_id": "SK_010", "gain": 1, "max_level": 5 }
+      ],
+      "prerequisites": {},
+      "upcoming_sessions": ["2026-10-04", "2026-10-18", "2026-11-01"]
+    }
+  ]
+}

@@ -1,0 +1,280 @@
+{
+  "proficiency_scale": {
+    "0": "Отсутствует",
+    "1": "Базовый (Junior)",
+    "2": "Уверенный (Middle)",
+    "3": "Продвинутый (Senior)",
+    "4": "Экспертный (Lead)",
+    "5": "Мастер / Архитектор"
+  },
+  "skills": [
+    {
+      "skill_id": "SK_001",
+      "name": "System Design & Архитектура",
+      "type": "hard",
+      "category": "Инженерия",
+      "description": "Проектирование распределенных отказоустойчивых банковских систем и микросервисов"
+    },
+    {
+      "skill_id": "SK_002",
+      "name": "Backend-разработка (Go/Python/Java)",
+      "type": "hard",
+      "category": "Инженерия",
+      "description": "Разработка высоконагруженных бэкенд-сервисов, API и бизнес-логики"
+    },
+    {
+      "skill_id": "SK_003",
+      "name": "Kubernetes & Cloud Native",
+      "type": "hard",
+      "category": "DevOps",
+      "description": "Контейнеризация, оркестрация K8s, CI/CD и мониторинг инфраструктуры"
+    },
+    {
+      "skill_id": "SK_004",
+      "name": "PostgreSQL & Оптимизация баз данных",
+      "type": "hard",
+      "category": "Базы данных",
+      "description": "Тюнинг запросов, партиционирование, транзакции, ACID и репликация"
+    },
+    {
+      "skill_id": "SK_005",
+      "name": "Финтех-безопасность & PCI DSS",
+      "type": "hard",
+      "category": "Безопасность",
+      "description": "Безопасная разработка (DevSecOps), стандарты PCI DSS, аудит уязвимостей"
+    },
+    {
+      "skill_id": "SK_006",
+      "name": "Публичные выступления & Питчинг",
+      "type": "soft",
+      "category": "Коммуникации",
+      "description": "Технические доклады на митапах, презентация архитектурных решений руководству"
+    },
+    {
+      "skill_id": "SK_007",
+      "name": "Менторство & Лидерство команд",
+      "type": "soft",
+      "category": "Лидерство",
+      "description": "Наставничество, онбординг, 1-on-1, мотивация и развитие инженеров"
+    },
+    {
+      "skill_id": "SK_008",
+      "name": "Системный и бизнес-анализ",
+      "type": "hard",
+      "category": "Продукт",
+      "description": "Трансформация бизнес-требований в технические спецификации, BPMN, UML"
+    },
+    {
+      "skill_id": "SK_009",
+      "name": "Банковские риски & Фин-комплаенс",
+      "type": "hard",
+      "category": "Банкинг",
+      "description": "Оценка операционных рисков, нормативы регулятора, антифрод и AML"
+    },
+    {
+      "skill_id": "SK_010",
+      "name": "Кросс-функциональное взаимодействие",
+      "type": "soft",
+      "category": "Коммуникации",
+      "description": "Эффективная синхронизация со смежными командами, бизнесом и стейкхолдерами"
+    },
+    {
+      "skill_id": "SK_011",
+      "name": "Frontend Architecture & Web Vitals",
+      "type": "hard",
+      "category": "Инженерия",
+      "description": "Клиентская архитектура, Core Web Vitals, SSR, микрофронтенды"
+    },
+    {
+      "skill_id": "SK_012",
+      "name": "Автоматизация тестирования (QA Automation)",
+      "type": "hard",
+      "category": "Тестирование",
+      "description": "E2E, интеграционные и нагрузочные тесты, пирамида тестирования"
+    },
+    {
+      "skill_id": "SK_013",
+      "name": "Data Engineering & Big Data ETL",
+      "type": "hard",
+      "category": "Данные",
+      "description": "Пакетная и потоковая обработка (Spark, Kafka, Airflow, ClickHouse)"
+    },
+    {
+      "skill_id": "SK_014",
+      "name": "Agile & Продуктовое мышление",
+      "type": "soft",
+      "category": "Процессы",
+      "description": "Scrum/Kanban, приоритизация бэклога, юнит-экономика и метрики продукта"
+    }
+  ],
+  "role_profiles": [
+    {
+      "role": "Backend Developer",
+      "grade": "Junior",
+      "required_skills": { "SK_002": 2, "SK_004": 2, "SK_010": 1 },
+      "critical_skills": ["SK_002"]
+    },
+    {
+      "role": "Backend Developer",
+      "grade": "Middle",
+      "required_skills": { "SK_001": 2, "SK_002": 3, "SK_003": 2, "SK_004": 3, "SK_005": 2, "SK_010": 2 },
+      "critical_skills": ["SK_002", "SK_004"]
+    },
+    {
+      "role": "Backend Developer",
+      "grade": "Senior",
+      "required_skills": { "SK_001": 4, "SK_002": 4, "SK_003": 3, "SK_004": 4, "SK_005": 3, "SK_006": 2, "SK_007": 3, "SK_010": 3 },
+      "critical_skills": ["SK_001", "SK_004", "SK_005"]
+    },
+    {
+      "role": "Backend Developer",
+      "grade": "Lead",
+      "required_skills": { "SK_001": 5, "SK_002": 4, "SK_003": 4, "SK_004": 4, "SK_005": 4, "SK_006": 4, "SK_007": 4, "SK_010": 4 },
+      "critical_skills": ["SK_001", "SK_007", "SK_006"]
+    },
+    {
+      "role": "Frontend Developer",
+      "grade": "Junior",
+      "required_skills": { "SK_011": 2, "SK_010": 1 },
+      "critical_skills": ["SK_011"]
+    },
+    {
+      "role": "Frontend Developer",
+      "grade": "Middle",
+      "required_skills": { "SK_011": 3, "SK_005": 2, "SK_010": 2, "SK_012": 2 },
+      "critical_skills": ["SK_011"]
+    },
+    {
+      "role": "Frontend Developer",
+      "grade": "Senior",
+      "required_skills": { "SK_011": 4, "SK_001": 3, "SK_005": 3, "SK_006": 2, "SK_007": 3, "SK_010": 3, "SK_012": 3 },
+      "critical_skills": ["SK_011", "SK_001"]
+    },
+    {
+      "role": "Frontend Developer",
+      "grade": "Lead",
+      "required_skills": { "SK_011": 5, "SK_001": 4, "SK_005": 3, "SK_006": 4, "SK_007": 4, "SK_010": 4, "SK_014": 3 },
+      "critical_skills": ["SK_011", "SK_007", "SK_006"]
+    },
+    {
+      "role": "DevOps Engineer",
+      "grade": "Junior",
+      "required_skills": { "SK_003": 2, "SK_004": 1, "SK_010": 1 },
+      "critical_skills": ["SK_003"]
+    },
+    {
+      "role": "DevOps Engineer",
+      "grade": "Middle",
+      "required_skills": { "SK_003": 3, "SK_001": 2, "SK_004": 2, "SK_005": 3, "SK_010": 2 },
+      "critical_skills": ["SK_003", "SK_005"]
+    },
+    {
+      "role": "DevOps Engineer",
+      "grade": "Senior",
+      "required_skills": { "SK_003": 4, "SK_001": 4, "SK_004": 3, "SK_005": 4, "SK_007": 3, "SK_010": 3 },
+      "critical_skills": ["SK_003", "SK_001", "SK_005"]
+    },
+    {
+      "role": "DevOps Engineer",
+      "grade": "Lead",
+      "required_skills": { "SK_003": 5, "SK_001": 5, "SK_004": 4, "SK_005": 4, "SK_006": 3, "SK_007": 4, "SK_010": 4 },
+      "critical_skills": ["SK_003", "SK_001", "SK_007"]
+    },
+    {
+      "role": "Data Engineer",
+      "grade": "Junior",
+      "required_skills": { "SK_013": 2, "SK_004": 2, "SK_002": 2, "SK_010": 1 },
+      "critical_skills": ["SK_013", "SK_004"]
+    },
+    {
+      "role": "Data Engineer",
+      "grade": "Middle",
+      "required_skills": { "SK_013": 3, "SK_004": 3, "SK_002": 3, "SK_003": 2, "SK_010": 2 },
+      "critical_skills": ["SK_013", "SK_004"]
+    },
+    {
+      "role": "Data Engineer",
+      "grade": "Senior",
+      "required_skills": { "SK_013": 4, "SK_001": 3, "SK_004": 4, "SK_003": 3, "SK_005": 3, "SK_007": 3, "SK_010": 3 },
+      "critical_skills": ["SK_013", "SK_001", "SK_004"]
+    },
+    {
+      "role": "Data Engineer",
+      "grade": "Lead",
+      "required_skills": { "SK_013": 5, "SK_001": 4, "SK_004": 5, "SK_003": 4, "SK_006": 3, "SK_007": 4, "SK_010": 4 },
+      "critical_skills": ["SK_013", "SK_001", "SK_007"]
+    },
+    {
+      "role": "QA Automation Engineer",
+      "grade": "Junior",
+      "required_skills": { "SK_012": 2, "SK_002": 1, "SK_010": 1 },
+      "critical_skills": ["SK_012"]
+    },
+    {
+      "role": "QA Automation Engineer",
+      "grade": "Middle",
+      "required_skills": { "SK_012": 3, "SK_002": 2, "SK_003": 2, "SK_004": 2, "SK_010": 2 },
+      "critical_skills": ["SK_012", "SK_002"]
+    },
+    {
+      "role": "QA Automation Engineer",
+      "grade": "Senior",
+      "required_skills": { "SK_012": 4, "SK_001": 2, "SK_002": 3, "SK_003": 3, "SK_005": 3, "SK_007": 3, "SK_010": 3 },
+      "critical_skills": ["SK_012", "SK_005"]
+    },
+    {
+      "role": "QA Automation Engineer",
+      "grade": "Lead",
+      "required_skills": { "SK_012": 5, "SK_001": 3, "SK_002": 4, "SK_003": 3, "SK_006": 3, "SK_007": 4, "SK_010": 4 },
+      "critical_skills": ["SK_012", "SK_007"]
+    },
+    {
+      "role": "System Analyst",
+      "grade": "Junior",
+      "required_skills": { "SK_008": 2, "SK_004": 1, "SK_010": 2 },
+      "critical_skills": ["SK_008"]
+    },
+    {
+      "role": "System Analyst",
+      "grade": "Middle",
+      "required_skills": { "SK_008": 3, "SK_001": 2, "SK_004": 2, "SK_009": 2, "SK_010": 3 },
+      "critical_skills": ["SK_008", "SK_001"]
+    },
+    {
+      "role": "System Analyst",
+      "grade": "Senior",
+      "required_skills": { "SK_008": 4, "SK_001": 3, "SK_004": 3, "SK_005": 3, "SK_009": 3, "SK_007": 2, "SK_010": 4 },
+      "critical_skills": ["SK_008", "SK_001", "SK_009"]
+    },
+    {
+      "role": "System Analyst",
+      "grade": "Lead",
+      "required_skills": { "SK_008": 5, "SK_001": 4, "SK_005": 4, "SK_009": 4, "SK_006": 3, "SK_007": 4, "SK_010": 5 },
+      "critical_skills": ["SK_008", "SK_001", "SK_007"]
+    },
+    {
+      "role": "Product Manager",
+      "grade": "Junior",
+      "required_skills": { "SK_014": 2, "SK_008": 2, "SK_010": 2 },
+      "critical_skills": ["SK_014"]
+    },
+    {
+      "role": "Product Manager",
+      "grade": "Middle",
+      "required_skills": { "SK_014": 3, "SK_008": 3, "SK_009": 2, "SK_006": 2, "SK_010": 3 },
+      "critical_skills": ["SK_014", "SK_008"]
+    },
+    {
+      "role": "Product Manager",
+      "grade": "Senior",
+      "required_skills": { "SK_014": 4, "SK_008": 4, "SK_009": 3, "SK_006": 3, "SK_007": 3, "SK_010": 4 },
+      "critical_skills": ["SK_014", "SK_009", "SK_006"]
+    },
+    {
+      "role": "Product Manager",
+      "grade": "Lead",
+      "required_skills": { "SK_014": 5, "SK_008": 4, "SK_009": 4, "SK_006": 4, "SK_007": 4, "SK_010": 5 },
+      "critical_skills": ["SK_014", "SK_007", "SK_006"]
+    }
+  ]
+}

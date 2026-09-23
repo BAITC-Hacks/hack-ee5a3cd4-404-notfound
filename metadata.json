@@ -1,0 +1,7 @@
+{
+  "name": "Career Quest - Halyk Bank AI Competency Platform",
+  "description": "Explainable multi-factor career trajectory recommendations, skill gap analytics, and HR competency intelligence for Halyk Bank.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
