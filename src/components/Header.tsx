@@ -1,5 +1,5 @@
 import React from 'react';
-import { Compass, Users, Upload, ShieldCheck, BookOpen, Gift, Globe } from 'lucide-react';
+import { Compass, Users, Upload, ShieldCheck, BookOpen, Gift, Globe, LogOut } from 'lucide-react';
 import { Language, translations } from '../i18n/translations.ts';
 
 interface HeaderProps {
@@ -8,6 +8,8 @@ interface HeaderProps {
   totalEmployees: number;
   lang: Language;
   setLang: (lang: Language) => void;
+  isAdmin: boolean;
+  onLogout: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -16,6 +18,8 @@ export const Header: React.FC<HeaderProps> = ({
   totalEmployees,
   lang,
   setLang,
+  isAdmin,
+  onLogout,
 }) => {
   const t = translations[lang];
 
@@ -81,29 +85,33 @@ export const Header: React.FC<HeaderProps> = ({
               <span>{t.tabs.gamification}</span>
             </button>
 
-            <button
-              onClick={() => setActiveTab('hr')}
-              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer shrink-0 whitespace-nowrap ${
-                activeTab === 'hr'
-                  ? 'bg-white text-slate-900 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Users className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-              <span>{lang === 'kz' ? 'HR-Талдау' : 'HR-Аналитика'}</span>
-            </button>
+            {isAdmin && (
+              <>
+                <button
+                  onClick={() => setActiveTab('hr')}
+                  className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer shrink-0 whitespace-nowrap ${
+                    activeTab === 'hr'
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Users className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                  <span>{lang === 'kz' ? 'HR-Талдау' : 'HR-Аналитика'}</span>
+                </button>
 
-            <button
-              onClick={() => setActiveTab('import')}
-              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer shrink-0 whitespace-nowrap ${
-                activeTab === 'import'
-                  ? 'bg-white text-slate-900 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Upload className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-              <span>{t.tabs.import}</span>
-            </button>
+                <button
+                  onClick={() => setActiveTab('import')}
+                  className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer shrink-0 whitespace-nowrap ${
+                    activeTab === 'import'
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Upload className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                  <span>{t.tabs.import}</span>
+                </button>
+              </>
+            )}
           </nav>
 
           {/* Right Tools: Language Switcher & Dataset Status */}
@@ -137,6 +145,15 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="font-semibold text-slate-800">{totalEmployees}</span>
               <span className="text-slate-500">{lang === 'kz' ? 'маман' : 'чел.'}</span>
             </div>
+
+            <button
+              onClick={onLogout}
+              title="Sign out"
+              aria-label="Sign out"
+              className="w-8 h-8 inline-flex items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </div>

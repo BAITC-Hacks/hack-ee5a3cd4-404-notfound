@@ -12,6 +12,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { Employee, LearningEvent } from '../types/index.ts';
+import { apiFetch } from '../lib/api.ts';
 
 interface EventsCatalogProps {
   currentEmployee: Employee;
@@ -32,7 +33,7 @@ export const EventsCatalog: React.FC<EventsCatalogProps> = ({
   const [completedId, setCompletedId] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('/api/events')
+    apiFetch('/api/events')
       .then((res) => res.json())
       .then((data) => {
         setEvents(data);

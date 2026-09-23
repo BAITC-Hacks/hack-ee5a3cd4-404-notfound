@@ -6,6 +6,7 @@ import {
   SimpleEmployeeInfo,
 } from '../types/index.ts';
 import { Language, translations } from '../i18n/translations.ts';
+import { apiFetch } from '../lib/api.ts';
 import {
   Coins,
   Trophy,
@@ -49,7 +50,7 @@ export const GamificationTab: React.FC<GamificationTabProps> = ({
   const fetchGamification = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/employees/${currentEmployee.employee_id}/gamification`);
+      const res = await apiFetch(`/api/employees/${currentEmployee.employee_id}/gamification`);
       if (!res.ok) throw new Error('Ошибка загрузки данных геймификации');
       const json = await res.json();
       setData(json);
@@ -77,7 +78,7 @@ export const GamificationTab: React.FC<GamificationTabProps> = ({
 
     try {
       setRedeemingId(reward.id);
-      const res = await fetch(
+      const res = await apiFetch(
         `/api/employees/${currentEmployee.employee_id}/rewards/redeem`,
         {
           method: 'POST',
@@ -115,7 +116,7 @@ export const GamificationTab: React.FC<GamificationTabProps> = ({
 
     try {
       setSendingKudos(true);
-      const res = await fetch(`/api/employees/${currentEmployee.employee_id}/kudos`, {
+      const res = await apiFetch(`/api/employees/${currentEmployee.employee_id}/kudos`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

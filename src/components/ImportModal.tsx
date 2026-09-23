@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Upload, CheckCircle2, AlertCircle, FileText, Sparkles, ArrowRight, Download } from 'lucide-react';
+import { apiFetch } from '../lib/api.ts';
 
 interface ImportModalProps {
   onImportSuccess: (importedId?: string) => Promise<void>;
@@ -235,12 +236,9 @@ export const ImportModal: React.FC<ImportModalProps> = ({ onImportSuccess }) => 
         });
       } catch (err: any) {
         if (err.message === 'DETECTED_HTML_PAGE') {
-          // Auto-recovery: The user got an HTML redirect file from browser cookies check.
-          // Recover automatically by inserting the clean test jury payload!
-          setJsonInput(JSON.stringify(sampleJuryPayload, null, 2));
           setStatusMessage({
-            type: 'success',
-            text: 'Загруженный файл оказался служебной HTML-страницей браузера. Мы автоматически восстановили корректный тестовый JSON для EMP_JURY_99 в редактор! Нажмите «Импортировать в систему» ниже.',
+            type: 'error',
+            text: 'Загруженный файл является HTML-страницей, а не набором данных. Импорт не выполнен.',
           });
         } else {
           setStatusMessage({
@@ -281,7 +279,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({ onImportSuccess }) => 
     setStatusMessage(null);
 
     try {
-      const res = await fetch('/api/import', {
+      const res = await apiFetch('/api/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(parsedPayload),

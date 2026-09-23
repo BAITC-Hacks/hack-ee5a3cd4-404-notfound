@@ -19,7 +19,9 @@ import { CareerSimulatorModal } from './components/CareerSimulatorModal.tsx';
 import { IndividualDevelopmentPlanModal } from './components/IndividualDevelopmentPlanModal.tsx';
 import { GamificationTab } from './components/GamificationTab.tsx';
 import { HREventBuilderModal } from './components/HREventBuilderModal.tsx';
+import { LoginScreen } from './components/LoginScreen.tsx';
 import { Language, translations } from './i18n/translations.ts';
+import { apiFetch, clearCsrfToken, setCsrfToken } from './lib/api.ts';
 import {
   Employee,
   Trajectory,
@@ -34,6 +36,13 @@ import { Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
 
 export default function App() {
   const [lang, setLang] = useState<Language>('ru');
+  const [session, setSession] = useState<{
+    username: string;
+    role: 'admin' | 'employee';
+    employeeId?: string;
+    csrfToken: string;
+  } | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'employee' | 'catalog' | 'gamification' | 'hr' | 'import'>('employee');
   const [employeesList, setEmployeesList] = useState<SimpleEmployeeInfo[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('EMP_001');
@@ -66,9 +75,49 @@ export default function App() {
     }, 4000);
   };
 
+  const handleAuthenticated = (nextSession: {
+    username: string;
+    role: 'admin' | 'employee';
+    employeeId?: string;
+    csrfToken: string;
+  }) => {
+    setCsrfToken(nextSession.csrfToken);
+    setSession(nextSession);
+    if (nextSession.employeeId) setSelectedEmployeeId(nextSession.employeeId);
+  };
+
+  const handleLogout = async () => {
+    try {
+      await apiFetch('/api/auth/logout', { method: 'POST' });
+    } finally {
+      clearCsrfToken();
+      setSession(null);
+      setEmployeesList([]);
+      setEmployeeData(null);
+      setHrOverview(null);
+    }
+  };
+
+  useEffect(() => {
+    let active = true;
+    apiFetch('/api/auth/session')
+      .then(async (res) => {
+        if (!res.ok) return;
+        const nextSession = await res.json();
+        if (active) handleAuthenticated(nextSession);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (active) setAuthLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const handleSaveGoal = async (targetRole: string, targetGrade: Grade) => {
     try {
-      const res = await fetch(`/api/employees/${selectedEmployeeId}/career-goal`, {
+      const res = await apiFetch(`/api/employees/${selectedEmployeeId}/career-goal`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ target_role: targetRole, target_grade: targetGrade }),
@@ -98,10 +147,16 @@ export default function App() {
   // Fetch all employees list
   const fetchEmployeesList = useCallback(async () => {
     try {
-      const res = await fetch('/api/employees');
+      const res = await apiFetch('/api/employees');
       if (res.ok) {
         const data = await res.json();
         setEmployeesList(data);
+        if (data.length > 0) {
+          setSelectedEmployeeId((current) => data.some((employee: SimpleEmployeeInfo) => employee.employee_id === current)
+            ? current
+            : data[0].employee_id
+          );
+        }
       }
     } catch (err) {
       console.error('Error fetching employees list:', err);
@@ -111,7 +166,7 @@ export default function App() {
   // Fetch HR Overview
   const fetchHROverview = useCallback(async () => {
     try {
-      const res = await fetch('/api/hr/overview');
+      const res = await apiFetch('/api/hr/overview');
       if (res.ok) {
         const data = await res.json();
         setHrOverview(data);
@@ -126,8 +181,8 @@ export default function App() {
     setLoading(true);
     try {
       const [empRes, recRes] = await Promise.all([
-        fetch(`/api/employees/${empId}`),
-        fetch(`/api/employees/${empId}/recommendations?limit=3`),
+        apiFetch(`/api/employees/${empId}`),
+        apiFetch(`/api/employees/${empId}/recommendations?limit=3`),
       ]);
 
       if (empRes.ok && recRes.ok) {
@@ -145,12 +200,18 @@ export default function App() {
     }
   }, []);
 
-  // Initial load
+  // Load the visible data only after the authenticated session is known.
   useEffect(() => {
+    if (!session) return;
     fetchEmployeesList();
-    fetchHROverview();
+    if (session.role === 'admin') fetchHROverview();
+  }, [session, fetchEmployeesList, fetchHROverview]);
+
+  useEffect(() => {
+    if (!session || !selectedEmployeeId) return;
+    if (session.role === 'employee' && session.employeeId !== selectedEmployeeId) return;
     fetchEmployeeDetails(selectedEmployeeId);
-  }, []);
+  }, [session, selectedEmployeeId, fetchEmployeeDetails]);
 
   // When selected employee changes
   const handleSelectEmployee = (id: string) => {
@@ -163,7 +224,7 @@ export default function App() {
     if (!employeeData) return;
     setIsCompleting(true);
     try {
-      const res = await fetch(
+      const res = await apiFetch(
         `/api/employees/${selectedEmployeeId}/activities/${eventId}/complete`,
         {
           method: 'POST',
@@ -180,7 +241,7 @@ export default function App() {
 
       // Dynamically update UI state without full reload
       const updatedHistory = await (
-        await fetch(`/api/employees/${selectedEmployeeId}`)
+        await apiFetch(`/api/employees/${selectedEmployeeId}`)
       ).json();
 
       setEmployeeData({
@@ -212,13 +273,21 @@ export default function App() {
   // Handler for import success from Jury modal
   const handleImportSuccess = async (importedId?: string) => {
     await fetchEmployeesList();
-    await fetchHROverview();
+    if (session?.role === 'admin') await fetchHROverview();
     if (importedId) {
       setSelectedEmployeeId(importedId);
       await fetchEmployeeDetails(importedId);
       setActiveTab('employee');
     }
   };
+
+  if (authLoading) {
+    return <div className="min-h-screen bg-slate-100" />;
+  }
+
+  if (!session) {
+    return <LoginScreen onAuthenticated={handleAuthenticated} />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
@@ -249,6 +318,8 @@ export default function App() {
         totalEmployees={employeesList.length || 200}
         lang={lang}
         setLang={setLang}
+        isAdmin={session.role === 'admin'}
+        onLogout={handleLogout}
       />
 
       {/* Main Body */}
@@ -362,7 +433,7 @@ export default function App() {
         )}
 
         {/* TAB 4: HR Analytics */}
-        {activeTab === 'hr' && (
+        {session.role === 'admin' && activeTab === 'hr' && (
           <div>
             {hrOverview ? (
               <HRDashboard
@@ -385,7 +456,7 @@ export default function App() {
         )}
 
         {/* TAB 5: Jury Import Panel */}
-        {activeTab === 'import' && (
+        {session.role === 'admin' && activeTab === 'import' && (
           <ImportModal onImportSuccess={handleImportSuccess} />
         )}
       </main>

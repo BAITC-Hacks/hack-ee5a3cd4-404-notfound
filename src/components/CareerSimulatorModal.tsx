@@ -11,6 +11,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { Employee, Trajectory, Grade } from '../types/index.ts';
+import { apiFetch } from '../lib/api.ts';
 
 interface RoleOption {
   role: string;
@@ -32,8 +33,6 @@ export const CareerSimulatorModal: React.FC<CareerSimulatorModalProps> = ({
   currentTrajectory,
   onSaveGoal,
 }) => {
-  if (!isOpen) return null;
-
   const [roles, setRoles] = useState<RoleOption[]>([]);
   const [selectedRole, setSelectedRole] = useState<string>(
     currentTrajectory.target_role || employee.role
@@ -45,22 +44,31 @@ export const CareerSimulatorModal: React.FC<CareerSimulatorModalProps> = ({
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    setSelectedRole(currentTrajectory.target_role || employee.role);
+    setSelectedGrade(currentTrajectory.target_grade || 'Senior');
+    setSimulatedTrajectory(null);
+  }, [isOpen, employee.role, currentTrajectory.target_role, currentTrajectory.target_grade]);
+
   // Load available roles from API
   useEffect(() => {
-    fetch('/api/roles')
+    if (!isOpen) return;
+    apiFetch('/api/roles')
       .then((res) => res.json())
       .then((data: RoleOption[]) => {
         setRoles(data);
       })
       .catch((err) => console.error('Error fetching roles:', err));
-  }, []);
+  }, [isOpen]);
 
   // Run simulation whenever role or grade changes
   useEffect(() => {
+    if (!isOpen) return;
     let isMounted = true;
     setIsSimulating(true);
 
-    fetch(`/api/employees/${employee.employee_id}/simulate-goal`, {
+    apiFetch(`/api/employees/${employee.employee_id}/simulate-goal`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -82,7 +90,9 @@ export const CareerSimulatorModal: React.FC<CareerSimulatorModalProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [employee.employee_id, selectedRole, selectedGrade]);
+  }, [isOpen, employee.employee_id, selectedRole, selectedGrade]);
+
+  if (!isOpen) return null;
 
   const activeGrades =
     roles.find((r) => r.role === selectedRole)?.grades || [

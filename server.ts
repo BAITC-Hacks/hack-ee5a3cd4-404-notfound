@@ -1,298 +1,331 @@
-import express from 'express';
+import 'dotenv/config';
+import express, { Request, Response } from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import {
+  authenticate,
+  canAccessEmployee,
+  clearLoginFailures,
+  clearSessionCookie,
+  getSession,
+  isAdmin,
+  loginAllowed,
+  recordLoginFailure,
+  requireAuthentication,
+  requireCsrf,
+  startSession,
+  verifyAuthConfiguration,
+} from './src/server/auth.ts';
 import { dataStore } from './src/server/dataStore.ts';
+import {
+  normalizeImportPayload,
+  validateCareerGoal,
+  validateImportPayload,
+  validateKudos,
+  validateLearningEvent,
+  validateRewardRedemption,
+  validationMessage,
+} from './src/server/validation.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+function sendInternalError(res: Response, context: string, error: unknown): void {
+  console.error(`${context}:`, error);
+  res.status(500).json({ error: 'Internal server error' });
+}
+
+function requireEmployeeAccess(req: Request, res: Response, employeeId: string): boolean {
+  if (canAccessEmployee(req, employeeId)) return true;
+  res.status(403).json({ error: 'You do not have access to this employee' });
+  return false;
+}
+
+function requireAdminAccess(req: Request, res: Response): boolean {
+  if (isAdmin(req)) return true;
+  res.status(403).json({ error: 'Administrator access is required' });
+  return false;
+}
+
+function readRecommendationLimit(value: unknown): number {
+  if (value === undefined) return 3;
+  if (typeof value !== 'string' || !/^\d+$/.test(value)) {
+    throw new Error('limit must be an integer between 1 and 10');
+  }
+  const limit = Number(value);
+  if (limit < 1 || limit > 10) throw new Error('limit must be an integer between 1 and 10');
+  return limit;
+}
+
 async function startServer() {
+  verifyAuthConfiguration();
   const app = express();
-  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+  const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
   const isProd = process.env.NODE_ENV === 'production';
+  const host = isProd ? '0.0.0.0' : '127.0.0.1';
 
-  app.use(express.json({ limit: '15mb' }));
+  if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) {
+    throw new Error('PORT must be an integer between 1 and 65535');
+  }
 
-  // API Routes
-  // 1. GET /api/employees - selector list
+  app.disable('x-powered-by');
+  app.set('trust proxy', 1);
+  app.use((_req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'same-origin');
+    if (isProd) res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    next();
+  });
+  app.use(express.json({ limit: '2mb' }));
+
+  app.post('/api/auth/login', (req, res) => {
+    const attemptKey = req.ip || req.socket.remoteAddress || 'unknown';
+    if (!loginAllowed(attemptKey)) {
+      return res.status(429).json({ error: 'Too many sign-in attempts. Try again later.' });
+    }
+
+    const username = typeof req.body?.username === 'string' ? req.body.username.trim() : '';
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+    if (!username || !password) return res.status(400).json({ error: 'Username and password are required' });
+
+    const session = authenticate(username, password);
+    if (!session || (session.role === 'employee' && !dataStore.employees.has(session.employeeId!))) {
+      recordLoginFailure(attemptKey);
+      return res.status(401).json({ error: 'Invalid username or password' });
+    }
+
+    clearLoginFailures(attemptKey);
+    startSession(res, session);
+    return res.json({
+      username: session.username,
+      role: session.role,
+      employeeId: session.employeeId,
+      csrfToken: session.csrfToken,
+    });
+  });
+
+  app.use('/api', requireAuthentication);
+  app.use('/api', requireCsrf);
+
+  app.get('/api/auth/session', (req, res) => {
+    const session = getSession(req);
+    res.json({
+      username: session.username,
+      role: session.role,
+      employeeId: session.employeeId,
+      csrfToken: session.csrfToken,
+    });
+  });
+
+  app.post('/api/auth/logout', (_req, res) => {
+    clearSessionCookie(res);
+    res.status(204).end();
+  });
+
   app.get('/api/employees', (req, res) => {
     try {
-      const list = Array.from(dataStore.employees.values()).map((emp) => ({
-        employee_id: emp.employee_id,
-        full_name: emp.full_name,
-        role: emp.role,
-        grade: emp.grade,
-        department: emp.department,
-        career_goal: emp.career_goal,
-      }));
-      res.json(list);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      const session = getSession(req);
+      const employees = session.role === 'admin'
+        ? Array.from(dataStore.employees.values())
+        : [dataStore.employees.get(session.employeeId!)].filter(Boolean);
+      res.json(employees.map((employee) => ({
+        employee_id: employee!.employee_id,
+        full_name: employee!.full_name,
+        role: employee!.role,
+        grade: employee!.grade,
+        department: employee!.department,
+        career_goal: employee!.career_goal,
+      })));
+    } catch (error) {
+      sendInternalError(res, 'Failed to list employees', error);
     }
   });
 
-  // 2. GET /api/employees/:id - profile + trajectory + history
   app.get('/api/employees/:id', (req, res) => {
+    const { id } = req.params;
+    if (!requireEmployeeAccess(req, res, id)) return;
     try {
-      const { id } = req.params;
       const employee = dataStore.employees.get(id);
-      if (!employee) {
-        return res.status(404).json({ error: `Сотрудник ${id} не найден` });
-      }
-
-      const trajectory = dataStore.calculateTrajectory(employee);
-      const history = dataStore.getEmployeeHistory(id);
-
+      if (!employee) return res.status(404).json({ error: 'Employee not found' });
       res.json({
         employee,
-        trajectory,
-        history,
+        trajectory: dataStore.calculateTrajectory(employee),
+        history: dataStore.getEmployeeHistory(id),
       });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
+    } catch (error) {
+      sendInternalError(res, 'Failed to get employee', error);
     }
   });
 
-  // 3. GET /api/employees/:id/recommendations - top-N recommendations with 3-factor explanation
   app.get('/api/employees/:id/recommendations', (req, res) => {
+    const { id } = req.params;
+    if (!requireEmployeeAccess(req, res, id)) return;
     try {
-      const { id } = req.params;
-      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 3;
       const employee = dataStore.employees.get(id);
-      if (!employee) {
-        return res.status(404).json({ error: `Сотрудник ${id} не найден` });
-      }
-
+      if (!employee) return res.status(404).json({ error: 'Employee not found' });
       const trajectory = dataStore.calculateTrajectory(employee);
-      const recommendations = dataStore.getRecommendations(id, limit);
-
       res.json({
         employee_id: id,
         target_role: trajectory.target_role,
         target_grade: trajectory.target_grade,
-        recommendations,
+        recommendations: dataStore.getRecommendations(id, readRecommendationLimit(req.query.limit)),
       });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid request' });
     }
   });
 
-  // 4. POST /api/employees/:id/activities/:eventId/complete - updates skills & history
   app.post('/api/employees/:id/activities/:eventId/complete', (req, res) => {
+    const { id, eventId } = req.params;
+    if (!requireEmployeeAccess(req, res, id)) return;
     try {
-      const { id, eventId } = req.params;
       const result = dataStore.completeActivity(id, eventId);
-      res.json({
-        success: true,
-        message: `Активность ${eventId} успешно отмечена выполненной`,
-        ...result,
-      });
-    } catch (err: any) {
-      res.status(400).json({ error: err.message });
+      res.json({ success: true, message: `Activity ${eventId} was completed`, ...result });
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : 'Unable to complete activity' });
     }
   });
 
-  // 5. GET /api/hr/overview - company-wide metrics & gaps
   app.get('/api/hr/overview', (req, res) => {
+    if (!requireAdminAccess(req, res)) return;
     try {
-      const overview = dataStore.getHROverview();
-      res.json(overview);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      res.json(dataStore.getHROverview());
+    } catch (error) {
+      sendInternalError(res, 'Failed to get HR overview', error);
     }
   });
 
-  // 6. POST /api/import - JSON import & merge without restart
-  app.post('/api/import', (req, res) => {
-    try {
-      let payload = req.body;
-      if (!payload || typeof payload !== 'object') {
-        return res.status(400).json({ error: 'Некорректный JSON в теле запроса' });
-      }
-
-      // Automatically wrap top-level array or single employee object
-      if (Array.isArray(payload)) {
-        if (payload.length > 0 && payload[0].employee_id && (payload[0].role || payload[0].skills)) {
-          payload = { employees: payload };
-        } else if (payload.length > 0 && payload[0].record_id) {
-          payload = { history: payload };
-        } else if (payload.length > 0 && payload[0].event_id) {
-          payload = { events: payload };
-        } else {
-          payload = { employees: payload };
-        }
-      } else if (payload.employee_id && (payload.role || payload.skills)) {
-        payload = { employees: [payload] };
-      } else if (payload.record_id && payload.event_id) {
-        payload = { history: [payload] };
-      }
-
-      const result = dataStore.importDataset(payload);
-      res.json(result);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  // 7. GET /api/skills - full skills matrix & role profiles
-  app.get('/api/skills', (req, res) => {
-    res.json(dataStore.skillsData);
-  });
-
-  // 8. GET /api/events - events catalogue
-  app.get('/api/events', (req, res) => {
-    res.json(Array.from(dataStore.events.values()));
-  });
-
-  // 9. GET /api/roles - list of available roles and grades
-  app.get('/api/roles', (req, res) => {
-    try {
-      res.json(dataStore.getAvailableRolesAndGrades());
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  // 10. POST /api/employees/:id/career-goal - set active career goal
-  app.post('/api/employees/:id/career-goal', (req, res) => {
-    try {
-      const { id } = req.params;
-      const { target_role, target_grade } = req.body;
-      if (!target_role || !target_grade) {
-        return res.status(400).json({ error: 'Параметры target_role и target_grade обязательны' });
-      }
-      const result = dataStore.updateCareerGoal(id, target_role, target_grade);
-      res.json({
-        success: true,
-        message: `Цель сотрудника успешно обновлена: ${target_role} (${target_grade})`,
-        ...result,
-      });
-    } catch (err: any) {
-      res.status(400).json({ error: err.message });
-    }
-  });
-
-  // 11. POST /api/employees/:id/simulate-goal - simulate what-if career transition
-  app.post('/api/employees/:id/simulate-goal', (req, res) => {
-    try {
-      const { id } = req.params;
-      const { target_role, target_grade } = req.body;
-      if (!target_role || !target_grade) {
-        return res.status(400).json({ error: 'Параметры target_role и target_grade обязательны' });
-      }
-      const result = dataStore.simulateGoal(id, target_role, target_grade);
-      res.json(result);
-    } catch (err: any) {
-      res.status(400).json({ error: err.message });
-    }
-  });
-
-  // 12. GET /api/employees/:id/gamification
-  app.get('/api/employees/:id/gamification', (req, res) => {
-    try {
-      const { id } = req.params;
-      const data = dataStore.getEmployeeGamification(id);
-      res.json({
-        ...data,
-        catalog: dataStore.rewardsCatalog,
-      });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  // 13. POST /api/employees/:id/kudos - send appreciation to colleague
-  app.post('/api/employees/:id/kudos', (req, res) => {
-    try {
-      const { id } = req.params;
-      const { to_employee_id, skill_id, message } = req.body;
-      if (!to_employee_id || !skill_id || !message) {
-        return res.status(400).json({ error: 'Поля to_employee_id, skill_id и message обязательны' });
-      }
-      const result = dataStore.sendKudos(id, to_employee_id, skill_id, message);
-      res.json(result);
-    } catch (err: any) {
-      res.status(400).json({ error: err.message });
-    }
-  });
-
-  // 14. POST /api/employees/:id/rewards/redeem - redeem Halyk Store item
-  app.post('/api/employees/:id/rewards/redeem', (req, res) => {
-    try {
-      const { id } = req.params;
-      const { reward_id } = req.body;
-      if (!reward_id) {
-        return res.status(400).json({ error: 'Параметр reward_id обязателен' });
-      }
-      const result = dataStore.redeemReward(id, reward_id);
-      res.json(result);
-    } catch (err: any) {
-      res.status(400).json({ error: err.message });
-    }
-  });
-
-  // 15. GET /api/rewards - list available benefits
-  app.get('/api/rewards', (req, res) => {
-    try {
-      res.json(dataStore.rewardsCatalog);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  // 16. GET /api/hr/attrition-risks - employee retention flight risks
   app.get('/api/hr/attrition-risks', (req, res) => {
+    if (!requireAdminAccess(req, res)) return;
     try {
       res.json(dataStore.calculateAttritionRisks());
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
+    } catch (error) {
+      sendInternalError(res, 'Failed to get attrition risks', error);
     }
   });
 
-  // 17. POST /api/events - HR Event Builder
-  app.post('/api/events', (req, res) => {
+  app.post('/api/import', (req, res) => {
+    if (!requireAdminAccess(req, res)) return;
     try {
-      const eventData = req.body;
-      if (!eventData || !eventData.title || !eventData.develops_skills) {
-        return res.status(400).json({ error: 'Необходимо указать название и развиваемые навыки' });
-      }
-      const eventId = eventData.event_id || `EV_HR_${Date.now()}`;
-      const created = dataStore.addCustomEvent({
-        ...eventData,
-        event_id: eventId,
-      });
-      res.json({
-        success: true,
-        message: `Мероприятие "${created.title}" успешно создано в Halyk Academy!`,
-        event: created,
-      });
-    } catch (err: any) {
-      res.status(400).json({ error: err.message });
+      const payload = validateImportPayload(normalizeImportPayload(req.body));
+      res.json(dataStore.importDataset(payload));
+    } catch (error) {
+      res.status(400).json({ error: validationMessage(error) });
     }
   });
 
-  // Frontend Serving / Vite Middleware
+  app.get('/api/skills', (_req, res) => res.json(dataStore.skillsData));
+  app.get('/api/events', (_req, res) => res.json(Array.from(dataStore.events.values())));
+
+  app.get('/api/roles', (_req, res) => {
+    try {
+      res.json(dataStore.getAvailableRolesAndGrades());
+    } catch (error) {
+      sendInternalError(res, 'Failed to list roles', error);
+    }
+  });
+
+  app.post('/api/employees/:id/career-goal', (req, res) => {
+    const { id } = req.params;
+    if (!requireEmployeeAccess(req, res, id)) return;
+    try {
+      const { targetRole, targetGrade } = validateCareerGoal(req.body);
+      if (!dataStore.hasRoleProfile(targetRole, targetGrade)) {
+        return res.status(400).json({ error: 'Unknown target role or grade' });
+      }
+      const result = dataStore.updateCareerGoal(id, targetRole, targetGrade);
+      res.json({ success: true, message: 'Career goal updated', ...result });
+    } catch (error) {
+      res.status(400).json({ error: validationMessage(error) });
+    }
+  });
+
+  app.post('/api/employees/:id/simulate-goal', (req, res) => {
+    const { id } = req.params;
+    if (!requireEmployeeAccess(req, res, id)) return;
+    try {
+      const { targetRole, targetGrade } = validateCareerGoal(req.body);
+      if (!dataStore.hasRoleProfile(targetRole, targetGrade)) {
+        return res.status(400).json({ error: 'Unknown target role or grade' });
+      }
+      res.json(dataStore.simulateGoal(id, targetRole, targetGrade));
+    } catch (error) {
+      res.status(400).json({ error: validationMessage(error) });
+    }
+  });
+
+  app.get('/api/employees/:id/gamification', (req, res) => {
+    const { id } = req.params;
+    if (!requireEmployeeAccess(req, res, id)) return;
+    try {
+      const data = dataStore.getEmployeeGamification(id);
+      res.json({ ...data, catalog: dataStore.rewardsCatalog });
+    } catch (error) {
+      res.status(404).json({ error: error instanceof Error ? error.message : 'Employee not found' });
+    }
+  });
+
+  app.post('/api/employees/:id/kudos', (req, res) => {
+    const { id } = req.params;
+    if (!requireEmployeeAccess(req, res, id)) return;
+    try {
+      const { toEmployeeId, skillId, message } = validateKudos(req.body);
+      res.json(dataStore.sendKudos(id, toEmployeeId, skillId, message));
+    } catch (error) {
+      res.status(400).json({ error: validationMessage(error) });
+    }
+  });
+
+  app.post('/api/employees/:id/rewards/redeem', (req, res) => {
+    const { id } = req.params;
+    if (!requireEmployeeAccess(req, res, id)) return;
+    try {
+      const { rewardId } = validateRewardRedemption(req.body);
+      res.json(dataStore.redeemReward(id, rewardId));
+    } catch (error) {
+      res.status(400).json({ error: validationMessage(error) });
+    }
+  });
+
+  app.get('/api/rewards', (_req, res) => res.json(dataStore.rewardsCatalog));
+
+  app.post('/api/events', (req, res) => {
+    if (!requireAdminAccess(req, res)) return;
+    try {
+      const rawEvent = req.body && typeof req.body === 'object' ? req.body as Record<string, unknown> : {};
+      const event = validateLearningEvent({
+        ...rawEvent,
+        event_id: typeof rawEvent.event_id === 'string' ? rawEvent.event_id : `EV_HR_${Date.now()}`,
+      });
+      const created = dataStore.addCustomEvent(event);
+      res.status(201).json({ success: true, message: `Event "${created.title}" was created`, event: created });
+    } catch (error) {
+      res.status(400).json({ error: validationMessage(error) });
+    }
+  });
+
+  app.use((error: Error & { type?: string }, _req: Request, res: Response, next: express.NextFunction) => {
+    if (error.type === 'entity.too.large') return res.status(413).json({ error: 'Request body is too large' });
+    return next(error);
+  });
+
   if (!isProd) {
     const { createServer } = await import('vite');
-    const vite = await createServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
+    const vite = await createServer({ server: { middlewareMode: true }, appType: 'spa' });
     app.use(vite.middlewares);
   } else {
     const distPath = path.resolve(__dirname, 'dist');
     app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.resolve(distPath, 'index.html'));
-    });
+    app.get('*', (_req, res) => res.sendFile(path.resolve(distPath, 'index.html')));
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server started on http://0.0.0.0:${PORT} (mode: ${isProd ? 'production' : 'development'})`);
+  app.listen(PORT, host, () => {
+    console.log(`Server started on http://${host}:${PORT} (mode: ${isProd ? 'production' : 'development'})`);
   });
 }
 
-startServer().catch((err) => {
-  console.error('Fatal error starting server:', err);
+startServer().catch((error) => {
+  console.error('Fatal error starting server:', error);
   process.exit(1);
 });

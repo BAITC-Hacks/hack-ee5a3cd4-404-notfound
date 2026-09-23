@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import {
   ActivityRecord,
   ActivityStatus,
@@ -19,6 +20,17 @@ import {
 } from '../types/index.ts';
 
 const GRADE_ORDER: Grade[] = ['Junior', 'Middle', 'Senior', 'Lead'];
+const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
+const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.resolve(MODULE_DIR, '../../data');
+const STATE_PATH = process.env.RUNTIME_STATE_PATH || path.join(DATA_DIR, 'runtime-state.json');
+
+interface PersistedState {
+  skillsData: SkillsData;
+  employees: Employee[];
+  events: LearningEvent[];
+  history: ActivityRecord[];
+  gamification: Array<[string, EmployeeGamification]>;
+}
 
 export class DataStore {
   public skillsData!: SkillsData;
@@ -81,10 +93,10 @@ export class DataStore {
 
   private loadInitialData() {
     try {
-      const skillsPath = path.resolve(process.cwd(), 'data/skills.json');
-      const eventsPath = path.resolve(process.cwd(), 'data/events.json');
-      const employeesPath = path.resolve(process.cwd(), 'data/employees.json');
-      const historyPath = path.resolve(process.cwd(), 'data/activity_history.csv');
+      const skillsPath = path.join(DATA_DIR, 'skills.json');
+      const eventsPath = path.join(DATA_DIR, 'events.json');
+      const employeesPath = path.join(DATA_DIR, 'employees.json');
+      const historyPath = path.join(DATA_DIR, 'activity_history.csv');
 
       if (fs.existsSync(skillsPath)) {
         this.skillsData = JSON.parse(fs.readFileSync(skillsPath, 'utf-8'));
@@ -128,9 +140,39 @@ export class DataStore {
           }
         }
       }
+
+      this.loadPersistedState();
     } catch (err) {
-      console.error('Failed to load initial dataset from /data:', err);
+      throw new Error(`Failed to load initial dataset from ${DATA_DIR}: ${err instanceof Error ? err.message : 'unknown error'}`);
     }
+  }
+
+  private loadPersistedState(): void {
+    if (!fs.existsSync(STATE_PATH)) return;
+
+    const parsed = JSON.parse(fs.readFileSync(STATE_PATH, 'utf-8')) as PersistedState;
+    if (!parsed.skillsData || !Array.isArray(parsed.employees) || !Array.isArray(parsed.events) || !Array.isArray(parsed.history)) {
+      throw new Error(`Runtime state at ${STATE_PATH} is invalid`);
+    }
+
+    this.skillsData = parsed.skillsData;
+    this.employees = new Map(parsed.employees.map((employee) => [employee.employee_id, employee]));
+    this.events = new Map(parsed.events.map((event) => [event.event_id, event]));
+    this.history = parsed.history;
+    this.gamification = new Map(parsed.gamification || []);
+  }
+
+  private persistState(): void {
+    const state: PersistedState = {
+      skillsData: this.skillsData,
+      employees: Array.from(this.employees.values()),
+      events: Array.from(this.events.values()),
+      history: this.history,
+      gamification: Array.from(this.gamification.entries()),
+    };
+    const tempPath = `${STATE_PATH}.${process.pid}.${Date.now()}.tmp`;
+    fs.writeFileSync(tempPath, JSON.stringify(state), 'utf-8');
+    fs.renameSync(tempPath, STATE_PATH);
   }
 
   public getNextGrade(currentGrade: Grade): Grade {
@@ -142,16 +184,13 @@ export class DataStore {
   }
 
   public getRoleProfile(role: string, grade: Grade): RoleProfile | undefined {
-    let profile = this.skillsData.role_profiles.find(
-      (p) => p.role.toLowerCase() === role.toLowerCase() && p.grade === grade
+    return this.skillsData.role_profiles.find(
+      (profile) => profile.role.toLowerCase() === role.toLowerCase() && profile.grade === grade
     );
-    if (!profile) {
-      // Fallback matching role
-      profile = this.skillsData.role_profiles.find(
-        (p) => p.role.toLowerCase() === role.toLowerCase()
-      );
-    }
-    return profile;
+  }
+
+  public hasRoleProfile(role: string, grade: Grade): boolean {
+    return Boolean(this.getRoleProfile(role, grade));
   }
 
   public getSkillById(skillId: string): Skill | undefined {
@@ -174,8 +213,11 @@ export class DataStore {
     }
 
     const roleProfile = this.getRoleProfile(targetRole, targetGrade);
-    const requiredSkills = roleProfile ? roleProfile.required_skills : {};
-    const criticalSkills = roleProfile ? roleProfile.critical_skills : [];
+    if (!roleProfile) {
+      throw new Error(`No role profile exists for ${targetRole} (${targetGrade})`);
+    }
+    const requiredSkills = roleProfile.required_skills;
+    const criticalSkills = roleProfile.critical_skills;
 
     const gaps: Trajectory['gaps'] = [];
     let requiredTotalPoints = 0;
@@ -375,6 +417,16 @@ export class DataStore {
     return records;
   }
 
+  private isRepeatableEvent(eventId: string): boolean {
+    return eventId === 'EV_036';
+  }
+
+  private prerequisitesMet(employee: Employee, event: LearningEvent): boolean {
+    return Object.entries(event.prerequisites || {}).every(
+      ([skillId, minimumLevel]) => (employee.skills[skillId] || 0) >= minimumLevel
+    );
+  }
+
   /**
    * Recommendation Algorithm
    * 1. Target (role, grade) -> required_skills & critical_skills
@@ -400,10 +452,10 @@ export class DataStore {
     const trajectory = this.calculateTrajectory(employee, customTargetRole, customTargetGrade);
     const empHistory = this.history.filter((h) => h.employee_id === employeeId);
 
-    // Completed events set (excluding EV_036 which is repeatable)
+    // Completed events set (excluding explicitly repeatable events)
     const completedEventIds = new Set(
       empHistory
-        .filter((h) => h.status === 'completed' && h.event_id !== 'EV_036')
+        .filter((h) => h.status === 'completed' && !this.isRepeatableEvent(h.event_id))
         .map((h) => h.event_id)
     );
 
@@ -432,13 +484,7 @@ export class DataStore {
       if (completedEventIds.has(event.event_id)) continue;
 
       // 3. Check prerequisites
-      let prereqsMet = true;
-      for (const [pSkillId, minLvl] of Object.entries(event.prerequisites || {})) {
-        if ((employee.skills[pSkillId] || 0) < minLvl) {
-          prereqsMet = false;
-          break;
-        }
-      }
+      const prereqsMet = this.prerequisitesMet(employee, event);
       if (!prereqsMet) continue;
 
       // 4. Check target roles / grades compatibility
@@ -608,6 +654,14 @@ export class DataStore {
 
     const event = this.events.get(eventId);
     if (!event) throw new Error(`Event ${eventId} not found`);
+    if (!this.isRepeatableEvent(eventId) && this.history.some(
+      (record) => record.employee_id === employeeId && record.event_id === eventId && record.status === 'completed'
+    )) {
+      throw new Error('This activity has already been completed');
+    }
+    if (!this.prerequisitesMet(employee, event)) {
+      throw new Error('Activity prerequisites are not met');
+    }
 
     const updatedSkills: Record<string, { prev: number; current: number; gain: number }> = {};
 
@@ -652,6 +706,8 @@ export class DataStore {
       }
     }
 
+    this.persistState();
+
     const trajectory = this.calculateTrajectory(employee);
     const recommendations = this.getRecommendations(employeeId, 3);
 
@@ -679,6 +735,7 @@ export class DataStore {
       target_role: targetRole,
       target_grade: targetGrade,
     };
+    this.persistState();
 
     const trajectory = this.calculateTrajectory(employee);
     const recommendations = this.getRecommendations(employeeId, 3);
@@ -977,7 +1034,8 @@ export class DataStore {
     let data = this.gamification.get(employeeId);
     if (!data) {
       const emp = this.employees.get(employeeId);
-      const tenure = emp?.tenure_months || 12;
+      if (!emp) throw new Error(`Employee ${employeeId} not found`);
+      const tenure = emp.tenure_months;
       const initialCoins = Math.min(300, 100 + tenure * 3);
 
       data = {
@@ -1054,18 +1112,25 @@ export class DataStore {
     const fromEmp = this.employees.get(fromEmpId);
     const toEmp = this.employees.get(toEmpId);
     if (!fromEmp || !toEmp) throw new Error('Сотрудник не найден');
+    if (fromEmpId === toEmpId) throw new Error('You cannot send kudos to yourself');
 
     const skillDef = this.getSkillById(skillId);
-    const skillName = skillDef?.name || skillId;
+    if (!skillDef) throw new Error('Unknown skill');
+    const skillName = skillDef.name;
+    const today = new Date().toISOString().split('T')[0];
 
     const toGami = this.getEmployeeGamification(toEmpId);
+    const alreadySentToday = toGami.kudos_received.some(
+      (kudos) => kudos.from_employee_id === fromEmpId && kudos.skill_id === skillId && kudos.date === today
+    );
+    if (alreadySentToday) throw new Error('Kudos for this skill has already been sent today');
     toGami.kudos_received.unshift({
       from_employee_id: fromEmpId,
       from_name: `${fromEmp.full_name} (${fromEmp.role} ${fromEmp.grade})`,
       skill_id: skillId,
       skill_name: skillName,
       message,
-      date: new Date().toISOString().split('T')[0],
+      date: today,
     });
     // Award recipient +15 coins
     toGami.coins += 15;
@@ -1081,6 +1146,7 @@ export class DataStore {
         fromGami.coins += kudosChallenge.reward_coins;
       }
     }
+    this.persistState();
 
     return {
       success: true,
@@ -1092,9 +1158,14 @@ export class DataStore {
     employeeId: string,
     rewardId: string
   ): { success: boolean; message: string; remaining_coins: number } {
+    if (!this.employees.has(employeeId)) throw new Error('Сотрудник не найден');
     const reward = this.rewardsCatalog.find((r) => r.id === rewardId);
     if (!reward) throw new Error('Вознаграждение не найдено в каталоге');
+    if (!reward.available) throw new Error('Вознаграждение сейчас недоступно');
     const gami = this.getEmployeeGamification(employeeId);
+    if (gami.redeemed_rewards.some((redeemed) => redeemed.reward_id === rewardId)) {
+      throw new Error('This reward has already been redeemed');
+    }
     if (gami.coins < reward.cost) {
       throw new Error(`Недостаточно Halyk Coins (баланс: ${gami.coins}, требуется: ${reward.cost})`);
     }
@@ -1106,6 +1177,7 @@ export class DataStore {
       cost: reward.cost,
       date: new Date().toISOString().split('T')[0],
     });
+    this.persistState();
 
     return {
       success: true,
@@ -1115,11 +1187,88 @@ export class DataStore {
   }
 
   public addCustomEvent(event: LearningEvent): LearningEvent {
-    if (!event.event_id || !event.title) {
-      throw new Error('Обязательные поля: event_id и title');
-    }
+    this.assertEventReferences(event, new Set(this.skillsData.skills.map((skill) => skill.skill_id)));
     this.events.set(event.event_id, event);
+    this.persistState();
     return event;
+  }
+
+  private assertEventReferences(event: LearningEvent, skillIds: Set<string>, roleNames?: Set<string>): void {
+    for (const skill of event.develops_skills) {
+      if (!skillIds.has(skill.skill_id)) throw new Error(`Unknown developed skill: ${skill.skill_id}`);
+    }
+    for (const skillId of Object.keys(event.prerequisites || {})) {
+      if (!skillIds.has(skillId)) throw new Error(`Unknown prerequisite skill: ${skillId}`);
+    }
+    const availableRoleNames = roleNames || new Set(this.skillsData.role_profiles.map((profile) => profile.role));
+    for (const role of event.target_roles) {
+      if (!availableRoleNames.has(role)) {
+        throw new Error(`Unknown target role: ${role}`);
+      }
+    }
+  }
+
+  private assertImportReferences(payload: {
+    employees?: Employee[];
+    history?: ActivityRecord[];
+    events?: LearningEvent[];
+    skills?: SkillsData;
+  }): void {
+    const skillIds = new Set(this.skillsData.skills.map((skill) => skill.skill_id));
+    payload.skills?.skills.forEach((skill) => skillIds.add(skill.skill_id));
+
+    const roleProfileKeys = new Set(
+      this.skillsData.role_profiles.map((profile) => `${profile.role.toLowerCase()}::${profile.grade}`)
+    );
+    const roleNames = new Set(this.skillsData.role_profiles.map((profile) => profile.role));
+    payload.skills?.role_profiles.forEach((profile) => {
+      roleProfileKeys.add(`${profile.role.toLowerCase()}::${profile.grade}`);
+      roleNames.add(profile.role);
+      Object.keys(profile.required_skills).forEach((skillId) => {
+        if (!skillIds.has(skillId)) throw new Error(`Unknown role-profile skill: ${skillId}`);
+      });
+      profile.critical_skills.forEach((skillId) => {
+        if (!skillIds.has(skillId)) throw new Error(`Unknown critical skill: ${skillId}`);
+      });
+    });
+
+    const employeeIds = new Set(this.employees.keys());
+    const eventIds = new Set(this.events.keys());
+    const importedEmployeeIds = new Set<string>();
+    const importedEventIds = new Set<string>();
+
+    payload.employees?.forEach((employee) => {
+      if (importedEmployeeIds.has(employee.employee_id)) throw new Error(`Duplicate employee id: ${employee.employee_id}`);
+      importedEmployeeIds.add(employee.employee_id);
+      employeeIds.add(employee.employee_id);
+
+      if (!roleProfileKeys.has(`${employee.role.toLowerCase()}::${employee.grade}`)) {
+        throw new Error(`Unknown employee role profile: ${employee.role} (${employee.grade})`);
+      }
+      if (employee.career_goal && !roleProfileKeys.has(
+        `${employee.career_goal.target_role.toLowerCase()}::${employee.career_goal.target_grade}`
+      )) {
+        throw new Error(`Unknown career goal: ${employee.career_goal.target_role} (${employee.career_goal.target_grade})`);
+      }
+      Object.keys(employee.skills).forEach((skillId) => {
+        if (!skillIds.has(skillId)) throw new Error(`Unknown employee skill: ${skillId}`);
+      });
+    });
+
+    payload.events?.forEach((event) => {
+      if (importedEventIds.has(event.event_id)) throw new Error(`Duplicate event id: ${event.event_id}`);
+      importedEventIds.add(event.event_id);
+      eventIds.add(event.event_id);
+      this.assertEventReferences(event, skillIds, roleNames);
+    });
+
+    const importedRecordIds = new Set<string>();
+    payload.history?.forEach((record) => {
+      if (importedRecordIds.has(record.record_id)) throw new Error(`Duplicate history record id: ${record.record_id}`);
+      importedRecordIds.add(record.record_id);
+      if (!employeeIds.has(record.employee_id)) throw new Error(`Unknown history employee: ${record.employee_id}`);
+      if (!eventIds.has(record.event_id)) throw new Error(`Unknown history event: ${record.event_id}`);
+    });
   }
 
   public importDataset(payload: {
@@ -1135,6 +1284,8 @@ export class DataStore {
     let importedEmployees = 0;
     let importedHistory = 0;
     let importedEvents = 0;
+
+    this.assertImportReferences(payload);
 
     if (payload.skills) {
       if (payload.skills.skills) {
@@ -1186,6 +1337,8 @@ export class DataStore {
         importedHistory++;
       });
     }
+
+    this.persistState();
 
     return {
       success: true,

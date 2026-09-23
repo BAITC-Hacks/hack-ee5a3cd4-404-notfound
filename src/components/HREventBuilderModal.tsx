@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ActivityType, Grade, LearningEvent } from '../types/index.ts';
 import { Language, translations } from '../i18n/translations.ts';
+import { apiFetch } from '../lib/api.ts';
 import { Plus, X, Calendar, Clock, BookOpen, Layers, CheckCircle2 } from 'lucide-react';
 
 interface HREventBuilderModalProps {
@@ -68,7 +69,7 @@ export const HREventBuilderModal: React.FC<HREventBuilderModalProps> = ({
         upcoming_sessions: ['2026-10-15', '2026-11-01'],
       };
 
-      const res = await fetch('/api/events', {
+      const res = await apiFetch('/api/events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newEventPayload),

@@ -40,9 +40,9 @@ export const IndividualDevelopmentPlanModal: React.FC<
   history,
   onShowToast,
 }) => {
-  if (!isOpen) return null;
-
   const [copied, setCopied] = useState<boolean>(false);
+
+  if (!isOpen) return null;
 
   const handlePrint = () => {
     window.print();
