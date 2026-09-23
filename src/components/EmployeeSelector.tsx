@@ -24,6 +24,7 @@ export const EmployeeSelector: React.FC<EmployeeSelectorProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('all');
+  const [gradeFilter, setGradeFilter] = useState('all');
 
   const departments = useMemo(() => {
     const set = new Set<string>();
@@ -41,9 +42,12 @@ export const EmployeeSelector: React.FC<EmployeeSelectorProps> = ({
       const matchesDept =
         departmentFilter === 'all' || e.department === departmentFilter;
 
-      return matchesSearch && matchesDept;
+      const matchesGrade =
+        gradeFilter === 'all' || e.grade === gradeFilter;
+
+      return matchesSearch && matchesDept && matchesGrade;
     });
-  }, [employees, searchQuery, departmentFilter]);
+  }, [employees, searchQuery, departmentFilter, gradeFilter]);
 
   const currentEmp = employees.find((e) => e.employee_id === selectedEmployeeId);
 
@@ -87,6 +91,22 @@ export const EmployeeSelector: React.FC<EmployeeSelectorProps> = ({
                   {d}
                 </option>
               ))}
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+
+          {/* Grade Filter */}
+          <div className="relative">
+            <select
+              value={gradeFilter}
+              onChange={(e) => setGradeFilter(e.target.value)}
+              className="appearance-none bg-slate-50 border border-slate-200 text-xs text-slate-700 rounded-lg pl-3 pr-8 py-2 focus:outline-none focus:ring-1 focus:ring-emerald-700 focus:border-emerald-700"
+            >
+              <option value="all">Все грейды</option>
+              <option value="Junior">Junior</option>
+              <option value="Middle">Middle</option>
+              <option value="Senior">Senior</option>
+              <option value="Lead">Lead</option>
             </select>
             <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>

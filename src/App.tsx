@@ -13,26 +13,28 @@ import { RecommendationCard } from './components/RecommendationCard.tsx';
 import { ActivityHistoryTable } from './components/ActivityHistoryTable.tsx';
 import { HRDashboard } from './components/HRDashboard.tsx';
 import { ImportModal } from './components/ImportModal.tsx';
+import { EventsCatalog } from './components/EventsCatalog.tsx';
+import { CompetencyRadarModal } from './components/CompetencyRadarModal.tsx';
+import { CareerSimulatorModal } from './components/CareerSimulatorModal.tsx';
+import { IndividualDevelopmentPlanModal } from './components/IndividualDevelopmentPlanModal.tsx';
+import { GamificationTab } from './components/GamificationTab.tsx';
+import { HREventBuilderModal } from './components/HREventBuilderModal.tsx';
+import { Language, translations } from './i18n/translations.ts';
 import {
   Employee,
   Trajectory,
   ActivityRecord,
   Recommendation,
   HROverview,
+  Grade,
+  LearningEvent,
+  SimpleEmployeeInfo,
 } from './types/index.ts';
 import { Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
 
-interface SimpleEmployeeInfo {
-  employee_id: string;
-  full_name: string;
-  role: string;
-  grade: string;
-  department: string;
-  career_goal: { target_role: string; target_grade: string } | null;
-}
-
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'employee' | 'hr' | 'import'>('employee');
+  const [lang, setLang] = useState<Language>('ru');
+  const [activeTab, setActiveTab] = useState<'employee' | 'catalog' | 'gamification' | 'hr' | 'import'>('employee');
   const [employeesList, setEmployeesList] = useState<SimpleEmployeeInfo[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('EMP_001');
 
@@ -47,6 +49,11 @@ export default function App() {
 
   const [loading, setLoading] = useState<boolean>(true);
   const [isCompleting, setIsCompleting] = useState<boolean>(false);
+  const [isSimulatorOpen, setIsSimulatorOpen] = useState<boolean>(false);
+  const [isRadarOpen, setIsRadarOpen] = useState<boolean>(false);
+  const [isPDPOpen, setIsPDPOpen] = useState<boolean>(false);
+  const [isEventBuilderOpen, setIsEventBuilderOpen] = useState<boolean>(false);
+
   const [toastMessage, setToastMessage] = useState<{
     type: 'success' | 'error';
     text: string;
@@ -57,6 +64,35 @@ export default function App() {
     setTimeout(() => {
       setToastMessage(null);
     }, 4000);
+  };
+
+  const handleSaveGoal = async (targetRole: string, targetGrade: Grade) => {
+    try {
+      const res = await fetch(`/api/employees/${selectedEmployeeId}/career-goal`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target_role: targetRole, target_grade: targetGrade }),
+      });
+      if (!res.ok) throw new Error('Ошибка сохранения карьерной цели');
+      const data = await res.json();
+      setEmployeeData((prev) =>
+        prev
+          ? {
+              ...prev,
+              employee: data.employee,
+              trajectory: data.trajectory,
+            }
+          : null
+      );
+      setRecommendations(data.recommendations);
+      fetchEmployeesList();
+      showToast(
+        `Целевая траектория обновлена: ${targetRole} (${targetGrade})!`,
+        'success'
+      );
+    } catch (err: any) {
+      showToast(err.message, 'error');
+    }
   };
 
   // Fetch all employees list
@@ -211,6 +247,8 @@ export default function App() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         totalEmployees={employeesList.length || 200}
+        lang={lang}
+        setLang={setLang}
       />
 
       {/* Main Body */}
@@ -244,6 +282,9 @@ export default function App() {
                 <ProfileCard
                   employee={employeeData.employee}
                   trajectory={employeeData.trajectory}
+                  onOpenSimulator={() => setIsSimulatorOpen(true)}
+                  onOpenRadar={() => setIsRadarOpen(true)}
+                  onOpenPDP={() => setIsPDPOpen(true)}
                 />
 
                 {/* AI Recommendations Section */}
@@ -301,12 +342,33 @@ export default function App() {
           </div>
         )}
 
-        {/* TAB 2: HR Analytics */}
+        {/* TAB 2: Events Catalog */}
+        {activeTab === 'catalog' && employeeData && (
+          <EventsCatalog
+            currentEmployee={employeeData.employee}
+            onCompleteActivity={handleCompleteActivity}
+            isCompleting={isCompleting}
+          />
+        )}
+
+        {/* TAB 3: Gamification, Challenges, Kudos & Benefits Store */}
+        {activeTab === 'gamification' && employeeData && (
+          <GamificationTab
+            currentEmployee={employeeData.employee}
+            allEmployees={employeesList}
+            lang={lang}
+            onShowToast={showToast}
+          />
+        )}
+
+        {/* TAB 4: HR Analytics */}
         {activeTab === 'hr' && (
           <div>
             {hrOverview ? (
               <HRDashboard
                 overview={hrOverview}
+                lang={lang}
+                onOpenEventBuilder={() => setIsEventBuilderOpen(true)}
                 onSelectEmployee={(empId) => {
                   setSelectedEmployeeId(empId);
                   fetchEmployeeDetails(empId);
@@ -322,11 +384,54 @@ export default function App() {
           </div>
         )}
 
-        {/* TAB 3: Jury Import Panel */}
+        {/* TAB 5: Jury Import Panel */}
         {activeTab === 'import' && (
           <ImportModal onImportSuccess={handleImportSuccess} />
         )}
       </main>
+
+      {/* Modals */}
+      {employeeData && (
+        <>
+          <CareerSimulatorModal
+            isOpen={isSimulatorOpen}
+            onClose={() => setIsSimulatorOpen(false)}
+            employee={employeeData.employee}
+            currentTrajectory={employeeData.trajectory}
+            onSaveGoal={handleSaveGoal}
+          />
+
+          <CompetencyRadarModal
+            isOpen={isRadarOpen}
+            onClose={() => setIsRadarOpen(false)}
+            employee={employeeData.employee}
+            trajectory={employeeData.trajectory}
+          />
+
+          <IndividualDevelopmentPlanModal
+            isOpen={isPDPOpen}
+            onClose={() => setIsPDPOpen(false)}
+            employee={employeeData.employee}
+            trajectory={employeeData.trajectory}
+            recommendations={recommendations}
+            history={employeeData.history}
+            onShowToast={showToast}
+          />
+
+          <HREventBuilderModal
+            isOpen={isEventBuilderOpen}
+            onClose={() => setIsEventBuilderOpen(false)}
+            lang={lang}
+            onEventCreated={(_created) => {
+              fetchHROverview();
+              if (selectedEmployeeId) {
+                fetchEmployeeDetails(selectedEmployeeId);
+              }
+            }}
+            onShowToast={showToast}
+          />
+        </>
+      )}
 
       {/* Footer */}
       <footer className="border-t border-slate-200 bg-white py-4 mt-12 text-xs text-slate-500">

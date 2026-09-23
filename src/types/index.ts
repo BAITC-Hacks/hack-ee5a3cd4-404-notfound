@@ -175,11 +175,74 @@ export interface Recommendation {
   metrics: RecommendationMetrics;
 }
 
+export interface EmployeeGamification {
+  employee_id: string;
+  coins: number;
+  badges: Array<{
+    id: string;
+    title: string;
+    description: string;
+    icon: string;
+    unlocked_at: string;
+  }>;
+  challenges: Array<{
+    id: string;
+    title: string;
+    description: string;
+    target: number;
+    current: number;
+    reward_coins: number;
+    completed: boolean;
+  }>;
+  kudos_received: Array<{
+    from_employee_id: string;
+    from_name: string;
+    skill_id: string;
+    skill_name: string;
+    message: string;
+    date: string;
+  }>;
+  redeemed_rewards: Array<{
+    reward_id: string;
+    title: string;
+    cost: number;
+    date: string;
+  }>;
+}
+
+export interface RewardItem {
+  id: string;
+  title: string;
+  description: string;
+  category: 'merch' | 'education' | 'perk' | 'event';
+  cost: number;
+  icon: string;
+  available: boolean;
+}
+
+export interface AttritionRiskItem {
+  employee_id: string;
+  full_name: string;
+  department: string;
+  role: string;
+  grade: Grade;
+  tenure_months: number;
+  readiness_pct: number;
+  risk_level: 'High' | 'Medium' | 'Low';
+  risk_score: number; // 0-100
+  primary_reasons: string[];
+  recommended_action: string;
+  stagnation_months: number;
+  decline_count: number;
+}
+
 export interface HROverview {
   total_employees: number;
   department_distribution: Record<string, number>;
   grade_distribution: Record<string, number>;
   avg_readiness_pct: number;
+  attrition_risks?: AttritionRiskItem[];
+  high_risk_count?: number;
   top_lagging_skills: Array<{
     skill_id: string;
     name: string;
@@ -219,4 +282,13 @@ export interface HROverview {
       completion_rate_pct: number;
     }>;
   };
+}
+
+export interface SimpleEmployeeInfo {
+  employee_id: string;
+  full_name: string;
+  role: string;
+  grade: string;
+  department: string;
+  career_goal: { target_role: string; target_grade: string } | null;
 }

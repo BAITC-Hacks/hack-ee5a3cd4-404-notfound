@@ -13,6 +13,9 @@ import {
   SkillProgressionPoint,
   SkillsData,
   Trajectory,
+  EmployeeGamification,
+  RewardItem,
+  AttritionRiskItem,
 } from '../types/index.ts';
 
 const GRADE_ORDER: Grade[] = ['Junior', 'Middle', 'Senior', 'Lead'];
@@ -22,6 +25,55 @@ export class DataStore {
   public employees: Map<string, Employee> = new Map();
   public events: Map<string, LearningEvent> = new Map();
   public history: ActivityRecord[] = [];
+  public gamification: Map<string, EmployeeGamification> = new Map();
+
+  public rewardsCatalog: RewardItem[] = [
+    {
+      id: 'REW_01',
+      title: 'Билет на Kolesa Conf / Digital Almaty',
+      description: 'Корпоративная оплата участия в ключевой IT-конференции Казахстана.',
+      category: 'event',
+      cost: 200,
+      icon: '🎫',
+      available: true,
+    },
+    {
+      id: 'REW_02',
+      title: 'Фирменный Tech Hoodie Halyk Bank',
+      description: 'Лимитированный оверсайз худи Halyk Engineering из органического хлопка.',
+      category: 'merch',
+      cost: 150,
+      icon: '👕',
+      available: true,
+    },
+    {
+      id: 'REW_03',
+      title: '1-on-1 сессия с Главным Архитектором',
+      description: 'Персональная 60-минутная архитектурная сессия и разбор системного дизайна вашего сервиса.',
+      category: 'education',
+      cost: 120,
+      icon: '🧠',
+      available: true,
+    },
+    {
+      id: 'REW_04',
+      title: 'Годовая подписка O\'Reilly Learning',
+      description: 'Неограниченный доступ к лучшим книгам, видеокурсам и песочницам по разработке.',
+      category: 'education',
+      cost: 100,
+      icon: '📚',
+      available: true,
+    },
+    {
+      id: 'REW_05',
+      title: 'Дополнительный Day-off за успехи в обучении',
+      description: 'Согласованный с тимлидом дополнительный день отдыха за закрытие квартального вызова.',
+      category: 'perk',
+      cost: 250,
+      icon: '🏖️',
+      available: true,
+    },
+  ];
 
   constructor() {
     this.loadInitialData();
@@ -106,12 +158,16 @@ export class DataStore {
     return this.skillsData.skills.find((s) => s.skill_id === skillId);
   }
 
-  public calculateTrajectory(employee: Employee): Trajectory {
-    let targetRole = employee.role;
-    let targetGrade: Grade = this.getNextGrade(employee.grade);
-    let isGoalCustom = false;
+  public calculateTrajectory(
+    employee: Employee,
+    customTargetRole?: string,
+    customTargetGrade?: Grade
+  ): Trajectory {
+    let targetRole = customTargetRole || employee.role;
+    let targetGrade: Grade = customTargetGrade || this.getNextGrade(employee.grade);
+    let isGoalCustom = Boolean(customTargetRole || customTargetGrade);
 
-    if (employee.career_goal?.target_role && employee.career_goal?.target_grade) {
+    if (!customTargetRole && !customTargetGrade && employee.career_goal?.target_role && employee.career_goal?.target_grade) {
       targetRole = employee.career_goal.target_role;
       targetGrade = employee.career_goal.target_grade;
       isGoalCustom = true;
@@ -270,8 +326,9 @@ export class DataStore {
 
     // Calculate learning velocity label and trend
     const netGrowth = currentLevel - startBaseline;
-    const slope = Number((netGrowth / 5).toFixed(2));
-    const velocity_badge = slope > 0 ? `+${slope}/act` : `0.0/act`;
+    const denom = Math.min(5, Math.max(1, lastEvents.length || 5));
+    const slope = netGrowth > 0 ? Number((netGrowth / denom).toFixed(1)) : 0;
+    const velocity_badge = slope > 0 ? `+${slope.toFixed(1)}/act` : `0.0/act`;
 
     let velocity_label = '0 ур. (плато)';
     let velocity_trend: 'up' | 'stable' | 'slow' = 'stable';
@@ -331,11 +388,16 @@ export class DataStore {
    *      - Specific decline of this event: -25!
    * 5. Detailed explanation synthesizing the 3 factors.
    */
-  public getRecommendations(employeeId: string, limit = 3): Recommendation[] {
+  public getRecommendations(
+    employeeId: string,
+    limit = 3,
+    customTargetRole?: string,
+    customTargetGrade?: Grade
+  ): Recommendation[] {
     const employee = this.employees.get(employeeId);
     if (!employee) return [];
 
-    const trajectory = this.calculateTrajectory(employee);
+    const trajectory = this.calculateTrajectory(employee, customTargetRole, customTargetGrade);
     const empHistory = this.history.filter((h) => h.employee_id === employeeId);
 
     // Completed events set (excluding EV_036 which is repeatable)
@@ -578,6 +640,18 @@ export class DataStore {
       assigned_by: 'self',
     });
 
+    // Reward voluntary learning coins and update challenges progress
+    const gamification = this.getEmployeeGamification(employeeId);
+    gamification.coins += 50;
+    const learnChallenge = gamification.challenges.find((c) => c.id === 'CH_02');
+    if (learnChallenge && !learnChallenge.completed) {
+      learnChallenge.current = Math.min(learnChallenge.target, learnChallenge.current + 1);
+      if (learnChallenge.current >= learnChallenge.target) {
+        learnChallenge.completed = true;
+        gamification.coins += learnChallenge.reward_coins;
+      }
+    }
+
     const trajectory = this.calculateTrajectory(employee);
     const recommendations = this.getRecommendations(employeeId, 3);
 
@@ -587,6 +661,70 @@ export class DataStore {
       recommendations,
       updated_skills: updatedSkills,
     };
+  }
+
+  public updateCareerGoal(
+    employeeId: string,
+    targetRole: string,
+    targetGrade: Grade
+  ): {
+    employee: Employee;
+    trajectory: Trajectory;
+    recommendations: Recommendation[];
+  } {
+    const employee = this.employees.get(employeeId);
+    if (!employee) throw new Error(`Сотрудник ${employeeId} не найден`);
+
+    employee.career_goal = {
+      target_role: targetRole,
+      target_grade: targetGrade,
+    };
+
+    const trajectory = this.calculateTrajectory(employee);
+    const recommendations = this.getRecommendations(employeeId, 3);
+
+    return {
+      employee,
+      trajectory,
+      recommendations,
+    };
+  }
+
+  public simulateGoal(
+    employeeId: string,
+    targetRole: string,
+    targetGrade: Grade
+  ): {
+    trajectory: Trajectory;
+    recommendations: Recommendation[];
+  } {
+    const employee = this.employees.get(employeeId);
+    if (!employee) throw new Error(`Сотрудник ${employeeId} не найден`);
+
+    const trajectory = this.calculateTrajectory(employee, targetRole, targetGrade);
+    const recommendations = this.getRecommendations(employeeId, 3, targetRole, targetGrade);
+
+    return {
+      trajectory,
+      recommendations,
+    };
+  }
+
+  public getAvailableRolesAndGrades(): { role: string; grades: Grade[] }[] {
+    const map = new Map<string, Grade[]>();
+    for (const p of this.skillsData.role_profiles) {
+      if (!map.has(p.role)) {
+        map.set(p.role, []);
+      }
+      const list = map.get(p.role)!;
+      if (!list.includes(p.grade)) {
+        list.push(p.grade);
+      }
+    }
+    return Array.from(map.entries()).map(([role, grades]) => ({
+      role,
+      grades,
+    }));
   }
 
   public getHROverview(): HROverview {
@@ -740,12 +878,17 @@ export class DataStore {
       .sort((a, b) => b.participants_count - a.participants_count)
       .slice(0, 10);
 
+    const attritionRisks = this.calculateAttritionRisks();
+    const highRiskCount = attritionRisks.filter((r) => r.risk_level === 'High').length;
+
     return {
       total_employees: totalEmployees,
       department_distribution: departmentDistribution,
       grade_distribution: gradeDistribution,
       avg_readiness_pct:
         totalEmployees > 0 ? Math.round(totalReadinessSum / totalEmployees) : 0,
+      attrition_risks: attritionRisks,
+      high_risk_count: highRiskCount,
       top_lagging_skills: topLaggingSkills,
       employees_without_recommendations: employeesWithoutRecommendations,
       activity_analytics: {
@@ -755,6 +898,228 @@ export class DataStore {
         top_events: topEvents,
       },
     };
+  }
+
+  public calculateAttritionRisks(): AttritionRiskItem[] {
+    const list: AttritionRiskItem[] = [];
+
+    for (const emp of this.employees.values()) {
+      const trajectory = this.calculateTrajectory(emp);
+      const empHistory = this.history.filter((h) => h.employee_id === emp.employee_id);
+      const declineCount = empHistory.filter((h) =>
+        ['declined', 'dropped', 'no_show', 'overdue'].includes(h.status)
+      ).length;
+
+      let riskScore = 15;
+      const reasons: string[] = [];
+
+      // Stagnation factor
+      const stagnationMonths = Math.max(0, emp.tenure_months - 18);
+      if (emp.tenure_months > 24 && trajectory.overall_readiness_pct < 65) {
+        riskScore += 25;
+        reasons.push(`Стаж более 24 месяцев при готовности к повышению ниже 65% (${trajectory.overall_readiness_pct}%)`);
+      }
+      if (emp.tenure_months > 36 && emp.grade !== 'Lead') {
+        riskScore += 20;
+        reasons.push(`Длительное нахождение на грейде ${emp.grade} (${emp.tenure_months} мес.)`);
+      }
+
+      // Behavioral disengagement factor
+      if (declineCount >= 2) {
+        riskScore += Math.min(30, declineCount * 12);
+        reasons.push(`Повышенная частота отказов/неявок на обучающие форматы (${declineCount} срывов)`);
+      }
+
+      // Critical skills deadlock
+      if (trajectory.critical_gaps_count >= 2) {
+        riskScore += 18;
+        reasons.push(`Блокирующий дефицит по ${trajectory.critical_gaps_count} критическим компетенциям грейда`);
+      }
+
+      if (reasons.length === 0) {
+        reasons.push('Стабильная динамика освоения навыков и участие в программах банка');
+      }
+
+      riskScore = Math.min(95, Math.max(8, riskScore));
+
+      let riskLevel: 'High' | 'Medium' | 'Low' = 'Low';
+      let recommendedAction = 'Плановое развитие в рамках текущего квартального ИПР.';
+
+      if (riskScore >= 60) {
+        riskLevel = 'High';
+        recommendedAction = 'Срочно назначить 1-on-1 с Team Lead, пересмотреть карьерный трек и назначить ментора из Senior/Lead.';
+      } else if (riskScore >= 35) {
+        riskLevel = 'Medium';
+        recommendedAction = 'Предложить практический воркшоп с высоким рейтингом вовлеченности и утвердить индивидуальный план роста.';
+      }
+
+      list.push({
+        employee_id: emp.employee_id,
+        full_name: emp.full_name,
+        department: emp.department,
+        role: emp.role,
+        grade: emp.grade,
+        tenure_months: emp.tenure_months,
+        readiness_pct: trajectory.overall_readiness_pct,
+        risk_level: riskLevel,
+        risk_score: riskScore,
+        primary_reasons: reasons,
+        recommended_action: recommendedAction,
+        stagnation_months: stagnationMonths,
+        decline_count: declineCount,
+      });
+    }
+
+    return list.sort((a, b) => b.risk_score - a.risk_score);
+  }
+
+  public getEmployeeGamification(employeeId: string): EmployeeGamification {
+    let data = this.gamification.get(employeeId);
+    if (!data) {
+      const emp = this.employees.get(employeeId);
+      const tenure = emp?.tenure_months || 12;
+      const initialCoins = Math.min(300, 100 + tenure * 3);
+
+      data = {
+        employee_id: employeeId,
+        coins: initialCoins,
+        badges: [
+          {
+            id: 'BADGE_01',
+            title: 'Halyk Explorer',
+            description: 'Успешный старт и синхронизация карьерной траектории',
+            icon: '🧭',
+            unlocked_at: '2026-01-15',
+          },
+          {
+            id: 'BADGE_02',
+            title: 'Continuous Learner',
+            description: 'Более 3 подтвержденных развивающих программ',
+            icon: '⚡',
+            unlocked_at: '2026-02-20',
+          },
+        ],
+        challenges: [
+          {
+            id: 'CH_01',
+            title: 'Архитектурный прорыв',
+            description: 'Повысить уровень владения ключевой критической компетенцией грейда',
+            target: 1,
+            current: 0,
+            reward_coins: 75,
+            completed: false,
+          },
+          {
+            id: 'CH_02',
+            title: 'Тяга к знаниям (Q3)',
+            description: 'Пройти 2 развивающих воркшопа или курса из каталога Halyk Academy',
+            target: 2,
+            current: 0,
+            reward_coins: 50,
+            completed: false,
+          },
+          {
+            id: 'CH_03',
+            title: 'Командный наставник',
+            description: 'Отправить 1 подтверждение признания (Kudos) коллеге за вклад в проект',
+            target: 1,
+            current: 0,
+            reward_coins: 30,
+            completed: false,
+          },
+        ],
+        kudos_received: [
+          {
+            from_employee_id: 'EMP_002',
+            from_name: 'Елена Смирнова (Senior Lead)',
+            skill_id: 'SK_001',
+            skill_name: 'System Design & Архитектура',
+            message: 'Отличный разбор схемы отказоустойчивости сервиса на прошлой неделе!',
+            date: '2026-03-01',
+          },
+        ],
+        redeemed_rewards: [],
+      };
+      this.gamification.set(employeeId, data);
+    }
+    return data;
+  }
+
+  public sendKudos(
+    fromEmpId: string,
+    toEmpId: string,
+    skillId: string,
+    message: string
+  ): { success: boolean; message: string } {
+    const fromEmp = this.employees.get(fromEmpId);
+    const toEmp = this.employees.get(toEmpId);
+    if (!fromEmp || !toEmp) throw new Error('Сотрудник не найден');
+
+    const skillDef = this.getSkillById(skillId);
+    const skillName = skillDef?.name || skillId;
+
+    const toGami = this.getEmployeeGamification(toEmpId);
+    toGami.kudos_received.unshift({
+      from_employee_id: fromEmpId,
+      from_name: `${fromEmp.full_name} (${fromEmp.role} ${fromEmp.grade})`,
+      skill_id: skillId,
+      skill_name: skillName,
+      message,
+      date: new Date().toISOString().split('T')[0],
+    });
+    // Award recipient +15 coins
+    toGami.coins += 15;
+
+    // Advance sender's challenge & award +5 coins
+    const fromGami = this.getEmployeeGamification(fromEmpId);
+    fromGami.coins += 5;
+    const kudosChallenge = fromGami.challenges.find((c) => c.id === 'CH_03');
+    if (kudosChallenge && !kudosChallenge.completed) {
+      kudosChallenge.current = Math.min(kudosChallenge.target, kudosChallenge.current + 1);
+      if (kudosChallenge.current >= kudosChallenge.target) {
+        kudosChallenge.completed = true;
+        fromGami.coins += kudosChallenge.reward_coins;
+      }
+    }
+
+    return {
+      success: true,
+      message: `Благодарность за компетенцию "${skillName}" успешно отправлена коллеге ${toEmp.full_name}!`,
+    };
+  }
+
+  public redeemReward(
+    employeeId: string,
+    rewardId: string
+  ): { success: boolean; message: string; remaining_coins: number } {
+    const reward = this.rewardsCatalog.find((r) => r.id === rewardId);
+    if (!reward) throw new Error('Вознаграждение не найдено в каталоге');
+    const gami = this.getEmployeeGamification(employeeId);
+    if (gami.coins < reward.cost) {
+      throw new Error(`Недостаточно Halyk Coins (баланс: ${gami.coins}, требуется: ${reward.cost})`);
+    }
+
+    gami.coins -= reward.cost;
+    gami.redeemed_rewards.unshift({
+      reward_id: reward.id,
+      title: reward.title,
+      cost: reward.cost,
+      date: new Date().toISOString().split('T')[0],
+    });
+
+    return {
+      success: true,
+      message: `Вы успешно получили: "${reward.title}". Заявка передана координатору Halyk Benefits.`,
+      remaining_coins: gami.coins,
+    };
+  }
+
+  public addCustomEvent(event: LearningEvent): LearningEvent {
+    if (!event.event_id || !event.title) {
+      throw new Error('Обязательные поля: event_id и title');
+    }
+    this.events.set(event.event_id, event);
+    return event;
   }
 
   public importDataset(payload: {

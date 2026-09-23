@@ -5,11 +5,17 @@ import { Employee, Trajectory } from '../types/index.ts';
 interface ProfileCardProps {
   employee: Employee;
   trajectory: Trajectory;
+  onOpenSimulator?: () => void;
+  onOpenRadar?: () => void;
+  onOpenPDP?: () => void;
 }
 
 export const ProfileCard: React.FC<ProfileCardProps> = ({
   employee,
   trajectory,
+  onOpenSimulator,
+  onOpenRadar,
+  onOpenPDP,
 }) => {
   const readinessColor =
     trajectory.overall_readiness_pct >= 85
@@ -98,6 +104,42 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
                   ? 'Все критические компетенции закрыты'
                   : `Требуется закрыть ${trajectory.critical_gaps_count} критических разрыва`}
               </span>
+            </div>
+
+            {/* Quick Action Toolbar */}
+            <div className="flex items-center gap-2 pt-3 mt-3 border-t border-slate-100 flex-wrap">
+              {onOpenSimulator && (
+                <button
+                  type="button"
+                  onClick={onOpenSimulator}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 text-xs font-semibold rounded-lg border border-indigo-200 transition-colors shadow-2xs"
+                >
+                  <span>🎯</span>
+                  <span>Карьерный симулятор</span>
+                </button>
+              )}
+
+              {onOpenRadar && (
+                <button
+                  type="button"
+                  onClick={onOpenRadar}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-semibold rounded-lg border border-emerald-200 transition-colors shadow-2xs"
+                >
+                  <span>🕸️</span>
+                  <span>Радар компетенций</span>
+                </button>
+              )}
+
+              {onOpenPDP && (
+                <button
+                  type="button"
+                  onClick={onOpenPDP}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200 transition-colors shadow-2xs"
+                >
+                  <span>📄</span>
+                  <span>Экспорт ИПР</span>
+                </button>
+              )}
             </div>
           </div>
         </div>

@@ -173,10 +173,11 @@ export function calculateHistoricalSkillProgression(
     });
   }
 
-  // Velocity calculation: slope of proficiency gain over the 5 data points
+  // Velocity calculation: slope of proficiency gain over the last completed activities for this skill (up to 5)
   const netGrowth = currentLevel - baseline;
-  const slope = Number((netGrowth / 5).toFixed(2));
-  const velocity_badge = slope > 0 ? `+${slope}/act` : `0.0/act`;
+  const denom = Math.min(5, Math.max(1, lastEvents.length || 5));
+  const slope = netGrowth > 0 ? Number((netGrowth / denom).toFixed(1)) : 0;
+  const velocity_badge = slope > 0 ? `+${slope.toFixed(1)}/act` : `0.0/act`;
 
   let velocity_label = '0 ур. (плато)';
   let velocity_trend: 'up' | 'stable' | 'slow' = 'stable';
@@ -336,9 +337,9 @@ export const SkillGapsTable: React.FC<SkillGapsTableProps> = ({
               if (!velocityBadge) {
                 const firstPt = progressionData[0]?.level ?? g.current_level;
                 const lastPt = progressionData[progressionData.length - 1]?.level ?? g.current_level;
-                const slopeVal = Number(Math.max(0, (lastPt - firstPt) / 5).toFixed(2));
+                const slopeVal = Number(Math.max(0, (lastPt - firstPt) / 5).toFixed(1));
                 learningVelocity = slopeVal;
-                velocityBadge = slopeVal > 0 ? `+${slopeVal}/act` : `0.0/act`;
+                velocityBadge = slopeVal > 0 ? `+${slopeVal.toFixed(1)}/act` : `0.0/act`;
               }
 
               return (

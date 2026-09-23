@@ -126,6 +126,133 @@ async function startServer() {
     res.json(Array.from(dataStore.events.values()));
   });
 
+  // 9. GET /api/roles - list of available roles and grades
+  app.get('/api/roles', (req, res) => {
+    try {
+      res.json(dataStore.getAvailableRolesAndGrades());
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 10. POST /api/employees/:id/career-goal - set active career goal
+  app.post('/api/employees/:id/career-goal', (req, res) => {
+    try {
+      const { id } = req.params;
+      const { target_role, target_grade } = req.body;
+      if (!target_role || !target_grade) {
+        return res.status(400).json({ error: 'Параметры target_role и target_grade обязательны' });
+      }
+      const result = dataStore.updateCareerGoal(id, target_role, target_grade);
+      res.json({
+        success: true,
+        message: `Цель сотрудника успешно обновлена: ${target_role} (${target_grade})`,
+        ...result,
+      });
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // 11. POST /api/employees/:id/simulate-goal - simulate what-if career transition
+  app.post('/api/employees/:id/simulate-goal', (req, res) => {
+    try {
+      const { id } = req.params;
+      const { target_role, target_grade } = req.body;
+      if (!target_role || !target_grade) {
+        return res.status(400).json({ error: 'Параметры target_role и target_grade обязательны' });
+      }
+      const result = dataStore.simulateGoal(id, target_role, target_grade);
+      res.json(result);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // 12. GET /api/employees/:id/gamification
+  app.get('/api/employees/:id/gamification', (req, res) => {
+    try {
+      const { id } = req.params;
+      const data = dataStore.getEmployeeGamification(id);
+      res.json({
+        ...data,
+        catalog: dataStore.rewardsCatalog,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 13. POST /api/employees/:id/kudos - send appreciation to colleague
+  app.post('/api/employees/:id/kudos', (req, res) => {
+    try {
+      const { id } = req.params;
+      const { to_employee_id, skill_id, message } = req.body;
+      if (!to_employee_id || !skill_id || !message) {
+        return res.status(400).json({ error: 'Поля to_employee_id, skill_id и message обязательны' });
+      }
+      const result = dataStore.sendKudos(id, to_employee_id, skill_id, message);
+      res.json(result);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // 14. POST /api/employees/:id/rewards/redeem - redeem Halyk Store item
+  app.post('/api/employees/:id/rewards/redeem', (req, res) => {
+    try {
+      const { id } = req.params;
+      const { reward_id } = req.body;
+      if (!reward_id) {
+        return res.status(400).json({ error: 'Параметр reward_id обязателен' });
+      }
+      const result = dataStore.redeemReward(id, reward_id);
+      res.json(result);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // 15. GET /api/rewards - list available benefits
+  app.get('/api/rewards', (req, res) => {
+    try {
+      res.json(dataStore.rewardsCatalog);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 16. GET /api/hr/attrition-risks - employee retention flight risks
+  app.get('/api/hr/attrition-risks', (req, res) => {
+    try {
+      res.json(dataStore.calculateAttritionRisks());
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 17. POST /api/events - HR Event Builder
+  app.post('/api/events', (req, res) => {
+    try {
+      const eventData = req.body;
+      if (!eventData || !eventData.title || !eventData.develops_skills) {
+        return res.status(400).json({ error: 'Необходимо указать название и развиваемые навыки' });
+      }
+      const eventId = eventData.event_id || `EV_HR_${Date.now()}`;
+      const created = dataStore.addCustomEvent({
+        ...eventData,
+        event_id: eventId,
+      });
+      res.json({
+        success: true,
+        message: `Мероприятие "${created.title}" успешно создано в Halyk Academy!`,
+        event: created,
+      });
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
   // Frontend Serving / Vite Middleware
   if (!isProd) {
     const { createServer } = await import('vite');
