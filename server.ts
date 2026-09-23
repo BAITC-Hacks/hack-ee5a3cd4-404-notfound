@@ -105,10 +105,28 @@ async function startServer() {
   // 6. POST /api/import - JSON import & merge without restart
   app.post('/api/import', (req, res) => {
     try {
-      const payload = req.body;
+      let payload = req.body;
       if (!payload || typeof payload !== 'object') {
         return res.status(400).json({ error: 'Некорректный JSON в теле запроса' });
       }
+
+      // Automatically wrap top-level array or single employee object
+      if (Array.isArray(payload)) {
+        if (payload.length > 0 && payload[0].employee_id && (payload[0].role || payload[0].skills)) {
+          payload = { employees: payload };
+        } else if (payload.length > 0 && payload[0].record_id) {
+          payload = { history: payload };
+        } else if (payload.length > 0 && payload[0].event_id) {
+          payload = { events: payload };
+        } else {
+          payload = { employees: payload };
+        }
+      } else if (payload.employee_id && (payload.role || payload.skills)) {
+        payload = { employees: [payload] };
+      } else if (payload.record_id && payload.event_id) {
+        payload = { history: [payload] };
+      }
+
       const result = dataStore.importDataset(payload);
       res.json(result);
     } catch (err: any) {

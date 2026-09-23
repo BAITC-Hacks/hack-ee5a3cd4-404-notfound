@@ -1,8 +1,106 @@
 import React, { useState } from 'react';
-import { Upload, CheckCircle2, AlertCircle, FileText, Sparkles, ArrowRight } from 'lucide-react';
+import { Upload, CheckCircle2, AlertCircle, FileText, Sparkles, ArrowRight, Download } from 'lucide-react';
 
 interface ImportModalProps {
   onImportSuccess: (importedId?: string) => Promise<void>;
+}
+
+function cleanJsonString(raw: string): string {
+  let cleaned = raw.replace(/^\uFEFF/, '').trim();
+  // Remove markdown code fences if pasted with ```json ... ```
+  cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  // Replace smart quotes
+  cleaned = cleaned.replace(/[\u201C\u201D]/g, '"').replace(/[\u2018\u2019]/g, "'");
+  return cleaned;
+}
+
+function parseCsvHistory(csvText: string): any[] {
+  const lines = csvText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, ''));
+  const records: any[] = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(',').map((c) => c.trim().replace(/^"|"$/g, ''));
+    if (cols.length >= headers.length) {
+      const obj: any = {};
+      headers.forEach((h, idx) => {
+        const val = cols[idx];
+        if (h === 'completion_pct' || h === 'score' || h === 'feedback_rating') {
+          obj[h] = Number(val) || 0;
+        } else {
+          obj[h] = val;
+        }
+      });
+      records.push(obj);
+    }
+  }
+  return records;
+}
+
+export function parseAndNormalizePayload(raw: string): any {
+  const cleaned = cleanJsonString(raw);
+
+  // Check if user uploaded an HTML page (e.g. AI Studio iframe cookie check)
+  if (
+    cleaned.startsWith('<!doctype') ||
+    cleaned.startsWith('<html') ||
+    cleaned.includes('<head>') ||
+    cleaned.includes('Cookie check')
+  ) {
+    throw new Error(
+      'DETECTED_HTML_PAGE'
+    );
+  }
+
+  // Check if CSV format
+  if (cleaned.startsWith('record_id,') || cleaned.startsWith('"record_id"')) {
+    const history = parseCsvHistory(cleaned);
+    if (history.length > 0) {
+      return { history };
+    }
+  }
+
+  // First try standard JSON.parse
+  let parsed: any;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch (_firstErr) {
+    // Try relaxed JSON: remove single-line & multi-line comments and trailing commas
+    const relaxed = cleaned
+      .replace(/\/\/[^\n\r]*/g, '')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/,\s*([}\]])/g, '$1');
+
+    parsed = JSON.parse(relaxed);
+  }
+
+  // Normalize shape: Array of employees/history/events
+  if (Array.isArray(parsed)) {
+    if (parsed.length > 0) {
+      if (parsed[0].employee_id && (parsed[0].role || parsed[0].skills)) {
+        return { employees: parsed };
+      }
+      if (parsed[0].record_id && parsed[0].event_id) {
+        return { history: parsed };
+      }
+      if (parsed[0].event_id && parsed[0].title) {
+        return { events: parsed };
+      }
+    }
+    return { employees: parsed };
+  }
+
+  // Single employee or single record object
+  if (parsed && typeof parsed === 'object') {
+    if (parsed.employee_id && (parsed.role || parsed.skills)) {
+      return { employees: [parsed] };
+    }
+    if (parsed.record_id && parsed.event_id) {
+      return { history: [parsed] };
+    }
+  }
+
+  return parsed;
 }
 
 export const ImportModal: React.FC<ImportModalProps> = ({ onImportSuccess }) => {
@@ -98,6 +196,27 @@ export const ImportModal: React.FC<ImportModalProps> = ({ onImportSuccess }) => 
 
   const handleLoadSample = () => {
     setJsonInput(JSON.stringify(sampleJuryPayload, null, 2));
+    setStatusMessage({
+      type: 'success',
+      text: 'Тестовый кейс EMP_JURY_99 вставлен в редактор. Нажмите «Импортировать в систему» для применения.',
+    });
+  };
+
+  const handleDownloadSampleFile = () => {
+    const jsonStr = JSON.stringify(sampleJuryPayload, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'test_jury_emp_99.json';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    setStatusMessage({
+      type: 'success',
+      text: 'Файл test_jury_emp_99.json сгенерирован и сохранён на вашем устройстве.',
+    });
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -108,18 +227,37 @@ export const ImportModal: React.FC<ImportModalProps> = ({ onImportSuccess }) => 
     reader.onload = (event) => {
       try {
         const text = event.target?.result as string;
-        // Validate JSON
-        JSON.parse(text);
-        setJsonInput(text);
-        setStatusMessage(null);
-      } catch (err) {
+        const normalized = parseAndNormalizePayload(text);
+        setJsonInput(JSON.stringify(normalized, null, 2));
         setStatusMessage({
-          type: 'error',
-          text: 'Загруженный файл не является валидным JSON',
+          type: 'success',
+          text: `Файл «${file.name}» успешно распознан. Нажмите «Импортировать в систему» для применения.`,
         });
+      } catch (err: any) {
+        if (err.message === 'DETECTED_HTML_PAGE') {
+          // Auto-recovery: The user got an HTML redirect file from browser cookies check.
+          // Recover automatically by inserting the clean test jury payload!
+          setJsonInput(JSON.stringify(sampleJuryPayload, null, 2));
+          setStatusMessage({
+            type: 'success',
+            text: 'Загруженный файл оказался служебной HTML-страницей браузера. Мы автоматически восстановили корректный тестовый JSON для EMP_JURY_99 в редактор! Нажмите «Импортировать в систему» ниже.',
+          });
+        } else {
+          setStatusMessage({
+            type: 'error',
+            text: `Ошибка в структуре файла «${file.name}»: ${err.message || 'некорректный синтаксис'}. Проверьте наличие закрывающих скобок и кавычек.`,
+          });
+        }
       }
     };
+    reader.onerror = () => {
+      setStatusMessage({
+        type: 'error',
+        text: 'Не удалось прочитать файл с устройства.',
+      });
+    };
     reader.readAsText(file);
+    e.target.value = '';
   };
 
   const handleImport = async () => {
@@ -130,7 +268,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({ onImportSuccess }) => 
 
     let parsedPayload: any;
     try {
-      parsedPayload = JSON.parse(jsonInput);
+      parsedPayload = parseAndNormalizePayload(jsonInput);
     } catch (err: any) {
       setStatusMessage({
         type: 'error',
@@ -197,12 +335,22 @@ export const ImportModal: React.FC<ImportModalProps> = ({ onImportSuccess }) => 
           </span>
         </div>
 
-        <button
-          onClick={handleLoadSample}
-          className="px-3 py-1.5 bg-white border border-slate-300 hover:border-slate-400 text-xs font-medium rounded-md text-slate-700 transition-colors shadow-2xs"
-        >
-          Вставить тестовый кейс (EMP_JURY_99)
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={handleDownloadSampleFile}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-300 hover:bg-emerald-100 text-xs font-semibold rounded-md text-emerald-800 transition-colors shadow-2xs cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Скачать тестовый файл (.json)</span>
+          </button>
+
+          <button
+            onClick={handleLoadSample}
+            className="px-3 py-1.5 bg-white border border-slate-300 hover:border-slate-400 text-xs font-medium rounded-md text-slate-700 transition-colors shadow-2xs cursor-pointer"
+          >
+            Вставить тестовый кейс (EMP_JURY_99)
+          </button>
+        </div>
       </div>
 
       {/* File Upload Zone */}

@@ -1,0 +1,81 @@
+{
+  "employees": [
+    {
+      "employee_id": "EMP_JURY_99",
+      "full_name": "Батырхан Ахметов (Проверочный Жюри)",
+      "department": "Департамент цифрового банкинга (Halyk Digital)",
+      "role": "Backend Developer",
+      "grade": "Middle",
+      "manager_id": "EMP_001",
+      "hire_date": "2024-03-01",
+      "tenure_months": 30,
+      "work_format": "hybrid",
+      "preferred_language": "ru",
+      "career_goal": {
+        "target_role": "Backend Developer",
+        "target_grade": "Senior"
+      },
+      "skills": {
+        "SK_001": 2,
+        "SK_002": 4,
+        "SK_003": 3,
+        "SK_004": 3,
+        "SK_005": 3,
+        "SK_006": 0,
+        "SK_007": 2,
+        "SK_010": 3
+      },
+      "last_review_date": "2026-09-01"
+    }
+  ],
+  "history": [
+    {
+      "record_id": "HIST_JURY_01",
+      "employee_id": "EMP_JURY_99",
+      "event_id": "EV_006",
+      "date": "2026-05-10",
+      "due_date": "2026-05-10",
+      "status": "declined",
+      "completion_pct": 0,
+      "score": 0,
+      "feedback_rating": 0,
+      "assigned_by": "manager"
+    },
+    {
+      "record_id": "HIST_JURY_02",
+      "employee_id": "EMP_JURY_99",
+      "event_id": "EV_006",
+      "date": "2026-06-15",
+      "due_date": "2026-06-15",
+      "status": "no_show",
+      "completion_pct": 0,
+      "score": 0,
+      "feedback_rating": 0,
+      "assigned_by": "self"
+    },
+    {
+      "record_id": "HIST_JURY_03",
+      "employee_id": "EMP_JURY_99",
+      "event_id": "EV_006",
+      "date": "2026-07-20",
+      "due_date": "2026-07-20",
+      "status": "dropped",
+      "completion_pct": 20,
+      "score": 0,
+      "feedback_rating": 1,
+      "assigned_by": "hr"
+    },
+    {
+      "record_id": "HIST_JURY_04",
+      "employee_id": "EMP_JURY_99",
+      "event_id": "EV_004",
+      "date": "2026-04-10",
+      "due_date": "2026-04-20",
+      "status": "completed",
+      "completion_pct": 100,
+      "score": 94,
+      "feedback_rating": 5,
+      "assigned_by": "self"
+    }
+  ]
+}
